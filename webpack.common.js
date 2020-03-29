@@ -5,13 +5,7 @@ const CopyPlugin = require("copy-webpack-plugin");
 
 const Assets = [
     "alameda/alameda.js",
-    "native-promise-only/npo.js",
-    "libass-wasm/dist/js/subtitles-octopus-worker.js",
-    "libass-wasm/dist/js/subtitles-octopus-worker.data",
-    "libass-wasm/dist/js/subtitles-octopus-worker.wasm",
-    "libass-wasm/dist/js/subtitles-octopus-worker-legacy.js",
-    "libass-wasm/dist/js/subtitles-octopus-worker-legacy.data",
-    "libass-wasm/dist/js/subtitles-octopus-worker-legacy.js.mem"
+    "native-promise-only/npo.js"
 ];
 
 module.exports = {

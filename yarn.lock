@@ -6576,10 +6576,6 @@ levn@^0.3.0, levn@~0.3.0:
     prelude-ls "~1.1.2"
     type-check "~0.3.2"
 
-"libass-wasm@https://github.com/jellyfin/JavascriptSubtitlesOctopus":
-  version "4.0.0"
-  resolved "https://github.com/jellyfin/JavascriptSubtitlesOctopus#1d12af0b04fb2337570b57d706dd97db2f904b9d"
-
 liftoff@^3.1.0:
   version "3.1.0"
   resolved "https://registry.yarnpkg.com/liftoff/-/liftoff-3.1.0.tgz#c9ba6081f908670607ee79062d700df062c52ed3"

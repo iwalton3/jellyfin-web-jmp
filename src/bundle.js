@@ -84,12 +84,6 @@ _define("webcomponents", function() {
     return webcomponents;
 });
 
-// libass-wasm
-var libass_wasm = require("libass-wasm");
-_define("JavascriptSubtitlesOctopus", function() {
-    return libass_wasm;
-});
-
 // material-icons
 var material_icons = require("material-design-icons-iconfont/dist/material-design-icons.css");
 _define("material-icons", function() {
