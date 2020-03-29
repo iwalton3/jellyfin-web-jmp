@@ -155,6 +155,25 @@ define(["events", "appStorage"], function(events, appStorage) {
     function onWebSocketOpen() {
         var instance = this;
         console.debug("web socket connection opened"), events.trigger(instance, "websocketopen")
+
+        // MPV Shim Auth
+        // There is almost certainly a better way to do this.
+        require(["connectionManager", "playbackManager"], function(connectionManager, playbackManager) {
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', "/mpv_shim_callback", true);
+            xhr.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
+            xhr.onloadend = function (result) {
+                var res = JSON.parse(result.target.response);
+                playbackManager.getTargets().then(function (targets) {
+                    for (var i = 0; i < targets.length; i++) {
+                        if (targets[i].appName == res.appName &&
+                            targets[i].deviceName == res.deviceName)
+                            playbackManager.trySetActivePlayer(targets[i].playerName, targets[i]);
+                    }
+                });
+            };
+            xhr.send(JSON.stringify(connectionManager.getLastUsedServer()));
+        });
     }
 
     function onWebSocketError() {
