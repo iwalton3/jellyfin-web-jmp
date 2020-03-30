@@ -249,7 +249,19 @@ define(['dom', 'browser', 'events', 'emby-tabs', 'emby-button'], function (dom, 
         }
 
         if (index != null) {
-            tabsElem.selectedIndex(index);
+            // For some reason, with the MPV Shim Edge client
+            // tabsElem.selectedIndex isn't defined until after this runs.
+            if (typeof tabsElem.selectedIndex !== "function") {
+                var intv = window.setInterval(function() {
+                    var tabs = window.document.querySelector('.skinHeader .headerTabs [is="emby-tabs"]')
+                    if (typeof tabs.selectedIndex === "function") {
+                        tabs.selectedIndex(index);
+                        window.clearInterval(intv);
+                    }
+                }, 100);
+            } else {
+                tabsElem.selectedIndex(index);
+            }
         } else {
             tabsElem.triggerTabChange();
         }
