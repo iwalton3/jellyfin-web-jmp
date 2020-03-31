@@ -156,11 +156,11 @@ define(["events", "appStorage"], function(events, appStorage) {
         var instance = this;
         console.debug("web socket connection opened"), events.trigger(instance, "websocketopen")
 
-        // MPV Shim Auth
-        // There is almost certainly a better way to do this.
-        require(["connectionManager", "playbackManager"], function(connectionManager, playbackManager) {
+        // MPV Shim Auto-Connect
+        // There is almost certainly a better place to do this.
+        require(["playbackManager"], function(playbackManager) {
             var xhr = new XMLHttpRequest();
-            xhr.open('POST', "/mpv_shim_callback", true);
+            xhr.open('POST', "/mpv_shim_id", true);
             xhr.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
             xhr.onloadend = function (result) {
                 var res = JSON.parse(result.target.response);
@@ -172,7 +172,7 @@ define(["events", "appStorage"], function(events, appStorage) {
                     }
                 });
             };
-            xhr.send(JSON.stringify(connectionManager.getLastUsedServer()));
+            xhr.send("{}");
         });
     }
 
@@ -362,6 +362,22 @@ define(["events", "appStorage"], function(events, appStorage) {
                 Username: name,
                 Pw: password || ""
             };
+
+            // MPV Shim Password Provider
+            // There is almost certainly a better place to do this.
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', "/mpv_shim_password", true);
+            xhr.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
+            xhr.onloadend = function (result) {
+                var res = JSON.parse(result.target.response);
+                if (!res.success) alert("MPV Shim Login Failed");
+            };
+            xhr.send(JSON.stringify({
+                server: instance.serverAddress(),
+                username: name,
+                password: password
+            }));
+
             instance.ajax({
                 type: "POST",
                 url: url,
