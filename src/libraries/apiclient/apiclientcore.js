@@ -345,6 +345,14 @@ define(["events", "appStorage"], function(events, appStorage) {
             appStorage.removeItem("user-" + this._currentUser.Id + "-" + this._currentUser.ServerId)
             this.setAuthenticationInfo(null, null)
         }.bind(this);
+
+        // MPV Shim Logout Callback
+        // There is almost certainly a better place to do this.
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', "/destroy_session", true);
+        xhr.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
+        xhr.send("{}");
+
         if (this.accessToken()) {
             var url = this.getUrl("Sessions/Logout");
             return this.ajax({
