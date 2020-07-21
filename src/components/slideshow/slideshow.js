@@ -1,17 +1,37 @@
-define(['dialogHelper', 'inputManager', 'connectionManager', 'layoutManager', 'focusManager', 'browser', 'apphost', 'loading', 'css!./style', 'material-icons', 'paper-icon-button-light'], function (dialogHelper, inputManager, connectionManager, layoutManager, focusManager, browser, appHost, loading) {
+/**
+ * Image viewer component
+ * @module components/slideshow/slideshow
+ */
+define(['dialogHelper', 'inputManager', 'connectionManager', 'layoutManager', 'focusManager', 'browser', 'apphost', 'dom', 'css!./style', 'material-icons', 'paper-icon-button-light'], function (dialogHelper, inputManager, connectionManager, layoutManager, focusManager, browser, appHost, dom) {
     'use strict';
 
-    function getImageUrl(item, options, apiClient) {
+    /**
+     * Name of transition event.
+     */
+    const transitionEndEventName = dom.whichTransitionEvent();
 
+    /**
+     * Flag to use fake image to fix blurry zoomed image.
+     * At least WebKit doesn't restore quality for zoomed images.
+     */
+    const useFakeZoomImage = browser.safari;
+
+    /**
+     * Retrieves an item's image URL from the API.
+     * @param {object|string} item - Item used to generate the image URL.
+     * @param {object} options - Options of the image.
+     * @param {object} apiClient - API client instance used to retrieve the image.
+     * @returns {null|string} URL of the item's image.
+     */
+    function getImageUrl(item, options, apiClient) {
         options = options || {};
-        options.type = options.type || "Primary";
+        options.type = options.type || 'Primary';
 
         if (typeof (item) === 'string') {
             return apiClient.getScaledImageUrl(item, options);
         }
 
         if (item.ImageTags && item.ImageTags[options.type]) {
-
             options.tag = item.ImageTags[options.type];
             return apiClient.getScaledImageUrl(item.Id, options);
         }
@@ -27,10 +47,16 @@ define(['dialogHelper', 'inputManager', 'connectionManager', 'layoutManager', 'f
         return null;
     }
 
+    /**
+     * Retrieves a backdrop's image URL from the API.
+     * @param {object} item - Item used to generate the image URL.
+     * @param {object} options - Options of the image.
+     * @param {object} apiClient - API client instance used to retrieve the image.
+     * @returns {null|string} URL of the item's backdrop.
+     */
     function getBackdropImageUrl(item, options, apiClient) {
-
         options = options || {};
-        options.type = options.type || "Backdrop";
+        options.type = options.type || 'Backdrop';
 
         // If not resizing, get the original image
         if (!options.maxWidth && !options.width && !options.maxHeight && !options.height) {
@@ -46,35 +72,45 @@ define(['dialogHelper', 'inputManager', 'connectionManager', 'layoutManager', 'f
         return null;
     }
 
-    function getImgUrl(item, original) {
-
+    /**
+     * Dispatches a request for an item's image to its respective handler.
+     * @param {object} item - Item used to generate the image URL.
+     * @returns {string} URL of the item's image.
+     */
+    function getImgUrl(item, user) {
         var apiClient = connectionManager.getApiClient(item.ServerId);
         var imageOptions = {};
 
-        if (!original) {
-            imageOptions.maxWidth = screen.availWidth;
-        }
         if (item.BackdropImageTags && item.BackdropImageTags.length) {
             return getBackdropImageUrl(item, imageOptions, apiClient);
         } else {
-
-            if (item.MediaType === 'Photo' && original) {
+            if (item.MediaType === 'Photo' && user && user.Policy.EnableContentDownloading) {
                 return apiClient.getItemDownloadUrl(item.Id);
             }
-            imageOptions.type = "Primary";
+            imageOptions.type = 'Primary';
             return getImageUrl(item, imageOptions, apiClient);
         }
     }
 
+    /**
+     * Generates a button using the specified icon, classes and properties.
+     * @param {string} icon - Name of the material icon on the button
+     * @param {string} cssClass - CSS classes to assign to the button
+     * @param {boolean} canFocus - Flag to set the tabindex attribute on the button to -1.
+     * @param {boolean} autoFocus - Flag to set the autofocus attribute on the button.
+     * @returns {string} The HTML markup of the button.
+     */
     function getIcon(icon, cssClass, canFocus, autoFocus) {
-
         var tabIndex = canFocus ? '' : ' tabindex="-1"';
         autoFocus = autoFocus ? ' autofocus' : '';
-        return '<button is="paper-icon-button-light" class="autoSize ' + cssClass + '"' + tabIndex + autoFocus + '><i class="material-icons slideshowButtonIcon ' + icon + '"></i></button>';
+        return '<button is="paper-icon-button-light" class="autoSize ' + cssClass + '"' + tabIndex + autoFocus + '><span class="material-icons slideshowButtonIcon ' + icon + '"></span></button>';
     }
 
+    /**
+     * Sets the viewport meta tag to enable or disable scaling by the user.
+     * @param {boolean} scalable - Flag to set the scalability of the viewport.
+     */
     function setUserScalable(scalable) {
-
         try {
             appHost.setUserScalable(scalable);
         } catch (err) {
@@ -83,23 +119,31 @@ define(['dialogHelper', 'inputManager', 'connectionManager', 'layoutManager', 'f
     }
 
     return function (options) {
-
         var self = this;
+        /** Initialized instance of Swiper. */
         var swiperInstance;
-        var dlg;
-        var currentTimeout;
-        var currentIntervalMs;
+        /** Initialized instance of the dialog containing the Swiper instance. */
+        var dialog;
+        /** Options of the slideshow components */
         var currentOptions;
-        var currentIndex;
+        /** ID of the timeout used to hide the OSD. */
+        var hideTimeout;
+        /** Last coordinates of the mouse pointer. */
+        var lastMouseMoveData;
+        /** Visibility status of the OSD. */
+        var _osdOpen = false;
 
-        // small hack since this is not possible anyway
-        if (browser.chromecast) {
-            options.interactive = false;
-        }
+        // Use autoplay on Chromecast since it is non-interactive.
+        if (browser.chromecast) options.interactive = false;
 
+        /**
+         * Creates the HTML markup for the dialog and the OSD.
+         * @param {Object} options - Options used to create the dialog and slideshow.
+         */
         function createElements(options) {
+            currentOptions = options;
 
-            dlg = dialogHelper.createDialog({
+            dialog = dialogHelper.createDialog({
                 exitAnimationDuration: options.interactive ? 400 : 800,
                 size: 'fullscreen',
                 autoFocus: false,
@@ -108,23 +152,21 @@ define(['dialogHelper', 'inputManager', 'connectionManager', 'layoutManager', 'f
                 removeOnClose: true
             });
 
-            dlg.classList.add('slideshowDialog');
+            dialog.classList.add('slideshowDialog');
 
             var html = '';
 
-            if (options.interactive) {
+            html += '<div class="slideshowSwiperContainer"><div class="swiper-wrapper"></div></div>';
 
+            if (options.interactive && !layoutManager.tv) {
                 var actionButtonsOnTop = layoutManager.mobile;
-
-                html += '<div>';
-                html += '<div class="slideshowSwiperContainer"><div class="swiper-wrapper"></div></div>';
 
                 html += getIcon('keyboard_arrow_left', 'btnSlideshowPrevious slideshowButton hide-mouse-idle-tv', false);
                 html += getIcon('keyboard_arrow_right', 'btnSlideshowNext slideshowButton hide-mouse-idle-tv', false);
 
                 html += '<div class="topActionButtons">';
                 if (actionButtonsOnTop) {
-                    if (appHost.supports('filedownload')) {
+                    if (appHost.supports('filedownload') && options.user && options.user.Policy.EnableContentDownloading) {
                         html += getIcon('file_download', 'btnDownload slideshowButton', true);
                     }
                     if (appHost.supports('sharing')) {
@@ -137,8 +179,8 @@ define(['dialogHelper', 'inputManager', 'connectionManager', 'layoutManager', 'f
                 if (!actionButtonsOnTop) {
                     html += '<div class="slideshowBottomBar hide">';
 
-                    html += getIcon('pause', 'btnSlideshowPause slideshowButton', true, true);
-                    if (appHost.supports('filedownload')) {
+                    html += getIcon('play_arrow', 'btnSlideshowPause slideshowButton', true, true);
+                    if (appHost.supports('filedownload') && options.user && options.user.Policy.EnableContentDownloading) {
                         html += getIcon('file_download', 'btnDownload slideshowButton', true);
                     }
                     if (appHost.supports('sharing')) {
@@ -148,33 +190,28 @@ define(['dialogHelper', 'inputManager', 'connectionManager', 'layoutManager', 'f
                     html += '</div>';
                 }
 
-                html += '</div>';
-
             } else {
                 html += '<div class="slideshowImage"></div><h1 class="slideshowImageText"></h1>';
             }
 
-            dlg.innerHTML = html;
+            dialog.innerHTML = html;
 
-            if (options.interactive) {
-                dlg.querySelector('.btnSlideshowExit').addEventListener('click', function (e) {
-
-                    dialogHelper.close(dlg);
+            if (options.interactive && !layoutManager.tv) {
+                dialog.querySelector('.btnSlideshowExit').addEventListener('click', function (e) {
+                    dialogHelper.close(dialog);
                 });
-                dlg.querySelector('.btnSlideshowNext').addEventListener('click', nextImage);
-                dlg.querySelector('.btnSlideshowPrevious').addEventListener('click', previousImage);
 
-                var btnPause = dlg.querySelector('.btnSlideshowPause');
+                var btnPause = dialog.querySelector('.btnSlideshowPause');
                 if (btnPause) {
                     btnPause.addEventListener('click', playPause);
                 }
 
-                var btnDownload = dlg.querySelector('.btnDownload');
+                var btnDownload = dialog.querySelector('.btnDownload');
                 if (btnDownload) {
                     btnDownload.addEventListener('click', download);
                 }
 
-                var btnShare = dlg.querySelector('.btnShare');
+                var btnShare = dialog.querySelector('.btnShare');
                 if (btnShare) {
                     btnShare.addEventListener('click', share);
                 }
@@ -182,81 +219,150 @@ define(['dialogHelper', 'inputManager', 'connectionManager', 'layoutManager', 'f
 
             setUserScalable(true);
 
-            dialogHelper.open(dlg).then(function () {
-
+            dialogHelper.open(dialog).then(function () {
                 setUserScalable(false);
-                stopInterval();
             });
 
             inputManager.on(window, onInputCommand);
+            /* eslint-disable-next-line compat/compat */
             document.addEventListener((window.PointerEvent ? 'pointermove' : 'mousemove'), onPointerMove);
 
-            dlg.addEventListener('close', onDialogClosed);
+            dialog.addEventListener('close', onDialogClosed);
 
-            if (options.interactive) {
-                loadSwiper(dlg);
-            }
+            loadSwiper(dialog, options);
         }
 
+        /**
+         * Handles OSD changes when the autoplay is started.
+         */
         function onAutoplayStart() {
-            var btnSlideshowPause = dlg.querySelector('.btnSlideshowPause i');
+            var btnSlideshowPause = dialog.querySelector('.btnSlideshowPause .material-icons');
             if (btnSlideshowPause) {
-                btnSlideshowPause.classList.remove("play_arrow");
-                btnSlideshowPause.classList.add("pause");
+                btnSlideshowPause.classList.replace('play_arrow', 'pause');
             }
         }
 
+        /**
+         * Handles OSD changes when the autoplay is stopped.
+         */
         function onAutoplayStop() {
-            var btnSlideshowPause = dlg.querySelector('.btnSlideshowPause i');
+            var btnSlideshowPause = dialog.querySelector('.btnSlideshowPause .material-icons');
             if (btnSlideshowPause) {
-                btnSlideshowPause.classList.remove("pause");
-                btnSlideshowPause.classList.add("play_arrow");
+                btnSlideshowPause.classList.replace('pause', 'play_arrow');
             }
         }
 
-        function loadSwiper(dlg) {
+        /**
+         * Handles zoom changes.
+         */
+        function onZoomChange(scale, imageEl, slideEl) {
+            const zoomImage = slideEl.querySelector('.swiper-zoom-fakeimg');
 
+            if (zoomImage) {
+                zoomImage.style.width = zoomImage.style.height = scale * 100 + '%';
+
+                if (scale > 1) {
+                    if (zoomImage.classList.contains('swiper-zoom-fakeimg-hidden')) {
+                        // Await for Swiper style changes
+                        setTimeout(() => {
+                            const callback = () => {
+                                imageEl.removeEventListener(transitionEndEventName, callback);
+                                zoomImage.classList.remove('swiper-zoom-fakeimg-hidden');
+                            };
+
+                            // Swiper set 'transition-duration: 300ms' for auto zoom
+                            // and 'transition-duration: 0s' for touch zoom
+                            const transitionDuration = parseFloat(imageEl.style.transitionDuration.replace(/[a-z]/i, ''));
+
+                            if (transitionDuration > 0) {
+                                imageEl.addEventListener(transitionEndEventName, callback);
+                            } else {
+                                callback();
+                            }
+                        }, 0);
+                    }
+                } else {
+                    zoomImage.classList.add('swiper-zoom-fakeimg-hidden');
+                }
+            }
+        }
+
+        /**
+         * Initializes the Swiper instance and binds the relevant events.
+         * @param {HTMLElement} dialog - Element containing the dialog.
+         * @param {Object} options - Options used to initialize the Swiper instance.
+         */
+        function loadSwiper(dialog, options) {
+            var slides;
             if (currentOptions.slides) {
-                dlg.querySelector('.swiper-wrapper').innerHTML = currentOptions.slides.map(getSwiperSlideHtmlFromSlide).join('');
+                slides = currentOptions.slides;
             } else {
-                dlg.querySelector('.swiper-wrapper').innerHTML = currentOptions.items.map(getSwiperSlideHtmlFromItem).join('');
+                slides = currentOptions.items;
             }
 
             require(['swiper'], function (Swiper) {
-
-                swiperInstance = new Swiper(dlg.querySelector('.slideshowSwiperContainer'), {
-                    // Optional parameters
+                swiperInstance = new Swiper(dialog.querySelector('.slideshowSwiperContainer'), {
                     direction: 'horizontal',
-                    loop: options.loop !== false,
-                    autoplay: {
-                        delay: options.interval || 8000
+                    // Loop is disabled due to the virtual slides option not supporting it.
+                    loop: false,
+                    zoom: {
+                        minRatio: 1,
+                        toggle: true
                     },
-                    // Disable preloading of all images
-                    preloadImages: false,
-                    // Enable lazy loading
-                    lazy: true,
-                    loadPrevNext: true,
-                    disableOnInteraction: false,
+                    autoplay: !options.interactive,
+                    keyboard: {
+                        enabled: true
+                    },
+                    preloadImages: true,
+                    slidesPerView: 1,
+                    slidesPerColumn: 1,
                     initialSlide: options.startIndex || 0,
-                    speed: 240
+                    speed: 240,
+                    navigation: {
+                        nextEl: '.btnSlideshowNext',
+                        prevEl: '.btnSlideshowPrevious'
+                    },
+                    // Virtual slides reduce memory consumption for large libraries while allowing preloading of images;
+                    virtual: {
+                        slides: slides,
+                        cache: true,
+                        renderSlide: getSwiperSlideHtml,
+                        addSlidesBefore: 1,
+                        addSlidesAfter: 1
+                    }
                 });
 
                 swiperInstance.on('autoplayStart', onAutoplayStart);
                 swiperInstance.on('autoplayStop', onAutoplayStop);
 
-                if (layoutManager.mobile) {
-                    pause();
-                } else {
-                    play();
+                if (useFakeZoomImage) {
+                    swiperInstance.on('zoomChange', onZoomChange);
                 }
             });
         }
 
-        function getSwiperSlideHtmlFromItem(item) {
+        /**
+         * Renders the HTML markup of a slide for an item or a slide.
+         * @param {Object} item - The item used to render the slide.
+         * @param {number} index - The index of the item in the Swiper instance.
+         * @returns {string} The HTML markup of the slide.
+         */
+        function getSwiperSlideHtml(item, index) {
+            if (currentOptions.slides) {
+                return getSwiperSlideHtmlFromSlide(item);
+            } else {
+                return getSwiperSlideHtmlFromItem(item);
+            }
+        }
 
+        /**
+         * Renders the HTML markup of a slide for an item.
+         * @param {Object} item - Item used to generate the slide.
+         * @returns {string} The HTML markup of the slide.
+         */
+        function getSwiperSlideHtmlFromItem(item) {
             return getSwiperSlideHtmlFromSlide({
-                imageUrl: getImgUrl(item),
-                originalImage: getImgUrl(item, true),
+                originalImage: getImgUrl(item, currentOptions.user),
                 //title: item.Name,
                 //description: item.Overview
                 Id: item.Id,
@@ -264,11 +370,20 @@ define(['dialogHelper', 'inputManager', 'connectionManager', 'layoutManager', 'f
             });
         }
 
+        /**
+         * Renders the HTML markup of a slide for a slide object.
+         * @param {Object} item - Slide object used to generate the slide.
+         * @returns {string} The HTML markup of the slide.
+         */
         function getSwiperSlideHtmlFromSlide(item) {
-
             var html = '';
-            html += '<div class="swiper-slide" data-imageurl="' + item.imageUrl + '" data-original="' + item.originalImage + '" data-itemid="' + item.Id + '" data-serverid="' + item.ServerId + '">';
-            html += '<img data-src="' + item.imageUrl + '" class="swiper-lazy swiper-slide-img">';
+            html += '<div class="swiper-slide" data-original="' + item.originalImage + '" data-itemid="' + item.Id + '" data-serverid="' + item.ServerId + '">';
+            html += '<div class="swiper-zoom-container">';
+            if (useFakeZoomImage) {
+                html += `<div class="swiper-zoom-fakeimg swiper-zoom-fakeimg-hidden" style="background-image: url('${item.originalImage}')"></div>`;
+            }
+            html += '<img src="' + item.originalImage + '" class="swiper-slide-img">';
+            html += '</div>';
             if (item.title || item.subtitle) {
                 html += '<div class="slideText">';
                 html += '<div class="slideTextInner">';
@@ -290,42 +405,18 @@ define(['dialogHelper', 'inputManager', 'connectionManager', 'layoutManager', 'f
             return html;
         }
 
-        function previousImage() {
-            if (swiperInstance) {
-                swiperInstance.slidePrev();
-            } else {
-                stopInterval();
-                showNextImage(currentIndex - 1);
-            }
-        }
-
-        function nextImage() {
-            if (swiperInstance) {
-
-                if (options.loop === false) {
-
-                    if (swiperInstance.activeIndex >= swiperInstance.slides.length - 1) {
-                        dialogHelper.close(dlg);
-                        return;
-                    }
-                }
-
-                swiperInstance.slideNext();
-            } else {
-                stopInterval();
-                showNextImage(currentIndex + 1);
-            }
-        }
-
+        /**
+         * Fetches the information of the currently displayed slide.
+         * @returns {null|{itemId: string, shareUrl: string, serverId: string, url: string}} Object containing the information of the currently displayed slide.
+         */
         function getCurrentImageInfo() {
-
             if (swiperInstance) {
                 var slide = document.querySelector('.swiper-slide-active');
 
                 if (slide) {
                     return {
                         url: slide.getAttribute('data-original'),
-                        shareUrl: slide.getAttribute('data-imageurl'),
+                        shareUrl: slide.getAttribute('data-original'),
                         itemId: slide.getAttribute('data-itemid'),
                         serverId: slide.getAttribute('data-serverid')
                     };
@@ -336,8 +427,10 @@ define(['dialogHelper', 'inputManager', 'connectionManager', 'layoutManager', 'f
             }
         }
 
+        /**
+         * Starts a download for the currently displayed slide.
+         */
         function download() {
-
             var imageInfo = getCurrentImageInfo();
 
             require(['fileDownloader'], function (fileDownloader) {
@@ -345,8 +438,10 @@ define(['dialogHelper', 'inputManager', 'connectionManager', 'layoutManager', 'f
             });
         }
 
+        /**
+         * Shares the currently displayed slide using the browser's built-in sharing feature.
+         */
         function share() {
-
             var imageInfo = getCurrentImageInfo();
 
             navigator.share({
@@ -354,20 +449,29 @@ define(['dialogHelper', 'inputManager', 'connectionManager', 'layoutManager', 'f
             });
         }
 
+        /**
+         * Starts the autoplay feature of the Swiper instance.
+         */
         function play() {
             if (swiperInstance.autoplay) {
                 swiperInstance.autoplay.start();
             }
         }
 
+        /**
+         * Pauses the autoplay feature of the Swiper instance;
+         */
         function pause() {
             if (swiperInstance.autoplay) {
                 swiperInstance.autoplay.stop();
             }
         }
 
+        /**
+         * Toggles the autoplay feature of the Swiper instance.
+         */
         function playPause() {
-            var paused = !dlg.querySelector('.btnSlideshowPause i').classList.contains("pause");
+            var paused = !dialog.querySelector('.btnSlideshowPause .material-icons').classList.contains('pause');
             if (paused) {
                 play();
             } else {
@@ -375,8 +479,10 @@ define(['dialogHelper', 'inputManager', 'connectionManager', 'layoutManager', 'f
             }
         }
 
+        /**
+         * Closes the dialog and destroys the Swiper instance.
+         */
         function onDialogClosed() {
-
             var swiper = swiperInstance;
             if (swiper) {
                 swiper.destroy(true, true);
@@ -384,56 +490,45 @@ define(['dialogHelper', 'inputManager', 'connectionManager', 'layoutManager', 'f
             }
 
             inputManager.off(window, onInputCommand);
+            /* eslint-disable-next-line compat/compat */
             document.removeEventListener((window.PointerEvent ? 'pointermove' : 'mousemove'), onPointerMove);
+            // Shows page scrollbar
+            document.body.classList.remove('hide-scroll');
+            document.body.classList.add('force-scroll');
         }
 
-        function startInterval(options) {
-
-            currentOptions = options;
-
-            stopInterval();
-            createElements(options);
-
-            if (!options.interactive) {
-                currentIntervalMs = options.interval || 11000;
-                showNextImage(options.startIndex || 0, true);
-            }
-        }
-
-        var _osdOpen = false;
-
-        function isOsdOpen() {
-            return _osdOpen;
-        }
-
-        function getOsdBottom() {
-            return dlg.querySelector('.slideshowBottomBar');
-        }
-
+        /**
+         * Shows the OSD.
+         */
         function showOsd() {
-
-            var bottom = getOsdBottom();
+            var bottom = dialog.querySelector('.slideshowBottomBar');
             if (bottom) {
                 slideUpToShow(bottom);
                 startHideTimer();
             }
         }
 
+        /**
+         * Hides the OSD.
+         */
         function hideOsd() {
-
-            var bottom = getOsdBottom();
+            var bottom = dialog.querySelector('.slideshowBottomBar');
             if (bottom) {
                 slideDownToHide(bottom);
             }
         }
 
-        var hideTimeout;
-
+        /**
+         * Starts the timer used to automatically hide the OSD.
+         */
         function startHideTimer() {
             stopHideTimer();
-            hideTimeout = setTimeout(hideOsd, 4000);
+            hideTimeout = setTimeout(hideOsd, 3000);
         }
 
+        /**
+         * Stops the timer used to automatically hide the OSD.
+         */
         function stopHideTimer() {
             if (hideTimeout) {
                 clearTimeout(hideTimeout);
@@ -441,71 +536,76 @@ define(['dialogHelper', 'inputManager', 'connectionManager', 'layoutManager', 'f
             }
         }
 
-        function slideUpToShow(elem) {
-
-            if (!elem.classList.contains('hide')) {
+        /**
+         * Shows the OSD by sliding it into view.
+         * @param {HTMLElement} element - Element containing the OSD.
+         */
+        function slideUpToShow(element) {
+            if (!element.classList.contains('hide')) {
                 return;
             }
 
             _osdOpen = true;
-            elem.classList.remove('hide');
+            element.classList.remove('hide');
 
             var onFinish = function () {
-                focusManager.focus(elem.querySelector('.btnSlideshowPause'));
+                focusManager.focus(element.querySelector('.btnSlideshowPause'));
             };
 
-            if (!elem.animate) {
+            if (!element.animate) {
                 onFinish();
                 return;
             }
 
             requestAnimationFrame(function () {
-
                 var keyframes = [
-                    { transform: 'translate3d(0,' + elem.offsetHeight + 'px,0)', opacity: '.3', offset: 0 },
+                    { transform: 'translate3d(0,' + element.offsetHeight + 'px,0)', opacity: '.3', offset: 0 },
                     { transform: 'translate3d(0,0,0)', opacity: '1', offset: 1 }
                 ];
                 var timing = { duration: 300, iterations: 1, easing: 'ease-out' };
-                elem.animate(keyframes, timing).onfinish = onFinish;
+                element.animate(keyframes, timing).onfinish = onFinish;
             });
         }
 
-        function slideDownToHide(elem) {
-
-            if (elem.classList.contains('hide')) {
+        /**
+         * Hides the OSD by sliding it out of view.
+         * @param {HTMLElement} element - Element containing the OSD.
+         */
+        function slideDownToHide(element) {
+            if (element.classList.contains('hide')) {
                 return;
             }
 
             var onFinish = function () {
-                elem.classList.add('hide');
+                element.classList.add('hide');
                 _osdOpen = false;
             };
 
-            if (!elem.animate) {
+            if (!element.animate) {
                 onFinish();
                 return;
             }
 
             requestAnimationFrame(function () {
-
                 var keyframes = [
                     { transform: 'translate3d(0,0,0)', opacity: '1', offset: 0 },
-                    { transform: 'translate3d(0,' + elem.offsetHeight + 'px,0)', opacity: '.3', offset: 1 }
+                    { transform: 'translate3d(0,' + element.offsetHeight + 'px,0)', opacity: '.3', offset: 1 }
                 ];
                 var timing = { duration: 300, iterations: 1, easing: 'ease-out' };
-                elem.animate(keyframes, timing).onfinish = onFinish;
+                element.animate(keyframes, timing).onfinish = onFinish;
             });
         }
 
-        var lastMouseMoveData;
-
-        function onPointerMove(e) {
-
-            var pointerType = e.pointerType || (layoutManager.mobile ? 'touch' : 'mouse');
+        /**
+         * Shows the OSD when moving the mouse pointer or touching the screen.
+         * @param {Event} event - Pointer movement event.
+         */
+        function onPointerMove(event) {
+            var pointerType = event.pointerType || (layoutManager.mobile ? 'touch' : 'mouse');
 
             if (pointerType === 'mouse') {
-                var eventX = e.screenX || 0;
-                var eventY = e.screenY || 0;
+                var eventX = event.screenX || 0;
+                var eventY = event.screenY || 0;
 
                 var obj = lastMouseMoveData;
                 if (!obj) {
@@ -528,125 +628,48 @@ define(['dialogHelper', 'inputManager', 'connectionManager', 'layoutManager', 'f
             }
         }
 
-        function onInputCommand(e) {
-
-            switch (e.detail.command) {
-
-                case 'left':
-                    if (!isOsdOpen()) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        previousImage();
-                    }
-                    break;
-                case 'right':
-                    if (!isOsdOpen()) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        nextImage();
-                    }
-                    break;
+        /**
+         * Dispatches keyboard inputs to their proper handlers.
+         * @param {Event} event - Keyboard input event.
+         */
+        function onInputCommand(event) {
+            switch (event.detail.command) {
                 case 'up':
                 case 'down':
                 case 'select':
                 case 'menu':
                 case 'info':
-                case 'play':
-                case 'playpause':
-                case 'pause':
                     showOsd();
+                    break;
+                case 'play':
+                    play();
+                    break;
+                case 'pause':
+                    pause();
+                    break;
+                case 'playpause':
+                    playPause();
                     break;
                 default:
                     break;
             }
         }
 
-        function showNextImage(index, skipPreload) {
-
-            index = Math.max(0, index);
-            if (index >= currentOptions.items.length) {
-                index = 0;
-            }
-            currentIndex = index;
-
-            var options = currentOptions;
-            var items = options.items;
-            var item = items[index];
-            var imgUrl = getImgUrl(item);
-
-            var onSrcLoaded = function () {
-                var cardImageContainer = dlg.querySelector('.slideshowImage');
-
-                var newCardImageContainer = document.createElement('div');
-                newCardImageContainer.className = cardImageContainer.className;
-
-                if (options.cover) {
-                    newCardImageContainer.classList.add('slideshowImage-cover');
-                }
-
-                newCardImageContainer.style.backgroundImage = "url('" + imgUrl + "')";
-                newCardImageContainer.classList.add('hide');
-                cardImageContainer.parentNode.appendChild(newCardImageContainer);
-
-                if (options.showTitle) {
-                    dlg.querySelector('.slideshowImageText').innerHTML = item.Name;
-                } else {
-                    dlg.querySelector('.slideshowImageText').innerHTML = '';
-                }
-
-                newCardImageContainer.classList.remove('hide');
-                var onAnimationFinished = function () {
-
-                    var parentNode = cardImageContainer.parentNode;
-                    if (parentNode) {
-                        parentNode.removeChild(cardImageContainer);
-                    }
-                };
-
-                if (newCardImageContainer.animate) {
-
-                    var keyframes = [
-                        { opacity: '0', offset: 0 },
-                        { opacity: '1', offset: 1 }
-                    ];
-                    var timing = { duration: 1200, iterations: 1 };
-                    newCardImageContainer.animate(keyframes, timing).onfinish = onAnimationFinished;
-                } else {
-                    onAnimationFinished();
-                }
-
-                stopInterval();
-                currentTimeout = setTimeout(function () {
-                    showNextImage(index + 1, true);
-
-                }, currentIntervalMs);
-            };
-
-            if (!skipPreload) {
-                var img = new Image();
-                img.onload = onSrcLoaded;
-                img.src = imgUrl;
-            } else {
-                onSrcLoaded();
-            }
-        }
-
-        function stopInterval() {
-            if (currentTimeout) {
-                clearTimeout(currentTimeout);
-                currentTimeout = null;
-            }
-        }
-
+        /**
+         * Shows the slideshow component.
+         */
         self.show = function () {
-            startInterval(options);
+            createElements(options);
+            // Hides page scrollbar
+            document.body.classList.remove('force-scroll');
+            document.body.classList.add('hide-scroll');
         };
 
+        /**
+         * Hides the slideshow element.
+         */
         self.hide = function () {
-
-            var dialog = dlg;
             if (dialog) {
-
                 dialogHelper.close(dialog);
             }
         };

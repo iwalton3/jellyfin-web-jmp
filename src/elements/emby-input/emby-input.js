@@ -1,4 +1,4 @@
-define(['layoutManager', 'browser', 'dom', 'css!./emby-input', 'registerElement'], function (layoutManager, browser, dom) {
+define(['layoutManager', 'browser', 'dom', 'css!./emby-input', 'webcomponents'], function (layoutManager, browser, dom) {
     'use strict';
 
     var EmbyInputPrototype = Object.create(HTMLInputElement.prototype);
@@ -109,9 +109,7 @@ define(['layoutManager', 'browser', 'dom', 'css!./emby-input', 'registerElement'
     }
 
     EmbyInputPrototype.attachedCallback = function () {
-
         this.labelElement.htmlFor = this.id;
-
         onChange.call(this);
     };
 

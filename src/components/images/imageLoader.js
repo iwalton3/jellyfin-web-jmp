@@ -1,54 +1,138 @@
-define(['lazyLoader', 'imageFetcher', 'layoutManager', 'browser', 'appSettings', 'userSettings', 'require', 'css!./style'], function (lazyLoader, imageFetcher, layoutManager, browser, appSettings, userSettings, require) {
-    'use strict';
+import * as lazyLoader from 'lazyLoader';
+import * as userSettings from 'userSettings';
+import * as blurhash from 'blurhash';
+import 'css!./style';
+/* eslint-disable indent */
 
-    var requestIdleCallback = window.requestIdleCallback || function (fn) {
-        fn();
-    };
-
-    var self = {};
-
-    function fillImage(elem, source, enableEffects) {
-
-        if (!elem) {
-            throw new Error('elem cannot be null');
-        }
-
-        if (!source) {
-            source = elem.getAttribute('data-src');
-        }
-
+    export function lazyImage(elem, source = elem.getAttribute('data-src')) {
         if (!source) {
             return;
         }
 
-        fillImageElement(elem, source, enableEffects);
+        fillImageElement(elem, source);
     }
 
-    function fillImageElement(elem, source, enableEffects) {
-        imageFetcher.loadImage(elem, source).then(function () {
-
-            if (enableEffects !== false) {
-                fadeIn(elem);
+    function itemBlurhashing(target, blurhashstr) {
+        if (blurhash.isBlurhashValid(blurhashstr)) {
+            // Although the default values recommended by Blurhash developers is 32x32, a size of 18x18 seems to be the sweet spot for us,
+            // improving the performance and reducing the memory usage, while retaining almost full blur quality.
+            // Lower values had more visible pixelation
+            let width = 18;
+            let height = 18;
+            let pixels;
+            try {
+                pixels = blurhash.decode(blurhashstr, width, height);
+            } catch (err) {
+                console.error('Blurhash decode error: ', err);
+                target.classList.add('non-blurhashable');
+                return;
             }
+            let canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            let ctx = canvas.getContext('2d');
+            let imgData = ctx.createImageData(width, height);
 
-            elem.removeAttribute("data-src");
-        });
-    }
+            imgData.data.set(pixels);
+            ctx.putImageData(imgData, 0, 0);
 
-    function fadeIn(elem) {
-        if (userSettings.enableFastFadein()) {
-            elem.classList.add('lazy-image-fadein-fast');
-        } else {
-            elem.classList.add('lazy-image-fadein');
+            requestAnimationFrame(() => {
+                canvas.classList.add('blurhash-canvas');
+                if (userSettings.enableFastFadein()) {
+                    canvas.classList.add('lazy-blurhash-fadein-fast');
+                } else {
+                    canvas.classList.add('lazy-blurhash-fadein');
+                }
+
+                target.parentNode.insertBefore(canvas, target);
+                target.classList.add('blurhashed');
+                target.removeAttribute('data-blurhash');
+            });
         }
     }
 
-    function lazyChildren(elem) {
+    export function fillImage(entry) {
+        if (!entry) {
+            throw new Error('entry cannot be null');
+        }
+        let target = entry.target;
+        var source = undefined;
 
+        if (target) {
+            source = target.getAttribute('data-src');
+        } else {
+            source = entry;
+        }
+
+        if (entry.intersectionRatio > 0) {
+            if (source) fillImageElement(target, source);
+        } else if (!source) {
+            requestAnimationFrame(() => {
+                emptyImageElement(target);
+            });
+        }
+    }
+
+    function fillImageElement(elem, url) {
+        if (url === undefined) {
+            throw new TypeError('url cannot be undefined');
+        }
+
+        let preloaderImg = new Image();
+        preloaderImg.src = url;
+
+        elem.classList.add('lazy-hidden');
+
+        preloaderImg.addEventListener('load', () => {
+            requestAnimationFrame(() => {
+                if (elem.tagName !== 'IMG') {
+                    elem.style.backgroundImage = "url('" + url + "')";
+                } else {
+                    elem.setAttribute('src', url);
+                }
+                elem.removeAttribute('data-src');
+
+                elem.classList.remove('lazy-hidden');
+                if (userSettings.enableFastFadein()) {
+                    elem.classList.add('lazy-image-fadein-fast');
+                } else {
+                    elem.classList.add('lazy-image-fadein');
+                }
+            });
+        });
+    }
+
+    function emptyImageElement(elem) {
+        var url;
+
+        if (elem.tagName !== 'IMG') {
+            url = elem.style.backgroundImage.slice(4, -1).replace(/"/g, '');
+            elem.style.backgroundImage = 'none';
+        } else {
+            url = elem.getAttribute('src');
+            elem.setAttribute('src', '');
+        }
+        elem.setAttribute('data-src', url);
+
+        elem.classList.remove('lazy-image-fadein-fast', 'lazy-image-fadein');
+        elem.classList.add('lazy-hidden');
+    }
+
+    export function lazyChildren(elem) {
+        if (userSettings.enableBlurhash()) {
+            for (const lazyElem of elem.getElementsByClassName('lazy')) {
+                const blurhashstr = lazyElem.getAttribute('data-blurhash');
+                if (!lazyElem.classList.contains('blurhashed', 'non-blurhashable') && blurhashstr) {
+                    itemBlurhashing(lazyElem, blurhashstr);
+                } else if (!blurhashstr && !lazyElem.classList.contains('blurhashed')) {
+                    lazyElem.classList.add('non-blurhashable');
+                }
+            }
+        }
         lazyLoader.lazyChildren(elem, fillImage);
     }
 
-    function getPrimaryImageAspectRatio(items) {
+    export function getPrimaryImageAspectRatio(items) {
 
         var values = [];
 
@@ -108,7 +192,7 @@ define(['lazyLoader', 'imageFetcher', 'layoutManager', 'browser', 'appSettings',
         return result;
     }
 
-    function fillImages(elems) {
+    export function fillImages(elems) {
 
         for (var i = 0, length = elems.length; i < length; i++) {
             var elem = elems[0];
@@ -116,10 +200,18 @@ define(['lazyLoader', 'imageFetcher', 'layoutManager', 'browser', 'appSettings',
         }
     }
 
-    self.fillImages = fillImages;
-    self.lazyImage = fillImage;
-    self.lazyChildren = lazyChildren;
-    self.getPrimaryImageAspectRatio = getPrimaryImageAspectRatio;
+    export function setLazyImage(element, url) {
+        element.classList.add('lazy');
+        element.setAttribute('data-src', url);
+        lazyImage(element);
+    }
 
-    return self;
-});
+/* eslint-enable indent */
+export default {
+    serLazyImage: setLazyImage,
+    fillImages: fillImages,
+    fillImage: fillImage,
+    lazyImage: lazyImage,
+    lazyChildren: lazyChildren,
+    getPrimaryImageAspectRatio: getPrimaryImageAspectRatio
+};

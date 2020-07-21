@@ -1,19 +1,29 @@
-define(["homescreenSettings", "userSettingsBuilder", "dom", "globalize", "loading", "userSettings", "autoFocuser", "listViewStyle"], function (HomescreenSettings, userSettingsBuilder, dom, globalize, loading, currentUserSettings, autoFocuser) {
-    "use strict";
+import HomescreenSettings from 'homescreenSettings';
+import dom from 'dom';
+import globalize from 'globalize';
+import loading from 'loading';
+import * as userSettings from 'userSettings';
+import autoFocuser from 'autoFocuser';
+import 'listViewStyle';
 
-    return function (view, params) {
+/* eslint-disable indent */
+
+    // Shortcuts
+    const UserSettings = userSettings.UserSettings;
+
+    export default function (view, params) {
         function onBeforeUnload(e) {
             if (hasChanges) {
-                e.returnValue = "You currently have unsaved changes. Are you sure you wish to leave?";
+                e.returnValue = 'You currently have unsaved changes. Are you sure you wish to leave?';
             }
         }
 
-        var homescreenSettingsInstance;
-        var hasChanges;
-        var userId = params.userId || ApiClient.getCurrentUserId();
-        var userSettings = userId === ApiClient.getCurrentUserId() ? currentUserSettings : new userSettingsBuilder();
-        view.addEventListener("viewshow", function () {
-            window.addEventListener("beforeunload", onBeforeUnload);
+        let homescreenSettingsInstance;
+        let hasChanges;
+        const userId = params.userId || ApiClient.getCurrentUserId();
+        const currentSettings = userId === ApiClient.getCurrentUserId() ? userSettings : new UserSettings();
+        view.addEventListener('viewshow', function () {
+            window.addEventListener('beforeunload', onBeforeUnload);
 
             if (homescreenSettingsInstance) {
                 homescreenSettingsInstance.loadData();
@@ -21,29 +31,25 @@ define(["homescreenSettings", "userSettingsBuilder", "dom", "globalize", "loadin
                 homescreenSettingsInstance = new HomescreenSettings({
                     serverId: ApiClient.serverId(),
                     userId: userId,
-                    element: view.querySelector(".homeScreenSettingsContainer"),
-                    userSettings: userSettings,
-                    enableSaveButton: false,
-                    enableSaveConfirmation: false,
+                    element: view.querySelector('.homeScreenSettingsContainer'),
+                    userSettings: currentSettings,
+                    enableSaveButton: true,
+                    enableSaveConfirmation: true,
                     autoFocus: autoFocuser.isEnabled()
                 });
             }
         });
-        view.addEventListener("change", function () {
+
+        view.addEventListener('change', function () {
             hasChanges = true;
         });
-        view.addEventListener("viewbeforehide", function () {
-            hasChanges = false;
 
-            if (homescreenSettingsInstance) {
-                homescreenSettingsInstance.submit();
-            }
-        });
-        view.addEventListener("viewdestroy", function () {
+        view.addEventListener('viewdestroy', function () {
             if (homescreenSettingsInstance) {
                 homescreenSettingsInstance.destroy();
                 homescreenSettingsInstance = null;
             }
         });
-    };
-});
+    }
+
+/* eslint-enable indent */

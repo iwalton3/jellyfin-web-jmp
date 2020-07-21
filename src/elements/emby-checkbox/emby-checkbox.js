@@ -1,4 +1,4 @@
-define(['browser', 'dom', 'css!./emby-checkbox', 'registerElement'], function (browser, dom) {
+define(['browser', 'dom', 'css!./emby-checkbox', 'webcomponents'], function (browser, dom) {
     'use strict';
 
     var EmbyCheckboxPrototype = Object.create(HTMLInputElement.prototype);
@@ -57,8 +57,8 @@ define(['browser', 'dom', 'css!./emby-checkbox', 'registerElement'], function (b
 
         var checkedIcon = this.getAttribute('data-checkedicon') || 'check';
         var uncheckedIcon = this.getAttribute('data-uncheckedicon') || '';
-        var checkHtml = '<i class="material-icons checkboxIcon checkboxIcon-checked">' + checkedIcon + '</i>';
-        var uncheckedHtml = '<i class="material-icons checkboxIcon checkboxIcon-unchecked">' + uncheckedIcon + '</i>';
+        var checkHtml = '<span class="material-icons checkboxIcon checkboxIcon-checked ' + checkedIcon + '"></span>';
+        var uncheckedHtml = '<span class="material-icons checkboxIcon checkboxIcon-unchecked ' + uncheckedIcon + '"></span>';
         labelElement.insertAdjacentHTML('beforeend', '<span class="' + outlineClass + '">' + checkHtml + uncheckedHtml + '</span>');
 
         labelTextElement.classList.add('checkboxLabel');
