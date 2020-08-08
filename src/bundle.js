@@ -217,6 +217,18 @@ var apiclient = require('jellyfin-apiclient');
         }
         this._webSocket.onopen = onOpen;
     };
+
+    apiclient.ApiClient.prototype.joinSyncPlayGroup = function(options = {}) {
+        return new Promise((resolve) => {
+            group_id = options.GroupId;
+            // Syncplay Join Group
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', "/mpv_shim_syncplay_join", true);
+            xhr.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
+            xhr.send(JSON.stringify(options));
+            resolve();
+        })
+    };
 })()
 // END Patches for MPV Shim
 
