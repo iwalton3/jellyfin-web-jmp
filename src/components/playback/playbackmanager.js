@@ -2025,6 +2025,16 @@ define(['events', 'datetime', 'appSettings', 'itemHelper', 'pluginManager', 'pla
                 }
             }
 
+            // Explicitly break non-MPV playback
+            require(['alert'], function (alert) {
+                alert({
+                    text: "MPV Shim's player backend is not connected. This could be caused by " +
+                          "many things. Try logging out/in again and making sure websockets work.",
+                    title: globalize.translate('HeaderPlaybackError')
+                });
+            });
+            return Promise.reject();
+
             if (options.fullscreen) {
                 loading.show();
             }
