@@ -1892,6 +1892,16 @@ class PlaybackManager {
                 }
             }
 
+            // BEGIN Patches for MPV Shim
+            // Explicitly break non-MPV playback
+            alert({
+                text: "MPV Shim's player backend is not connected. This could be caused by " +
+                        "many things. Try logging out/in again and making sure websockets work.",
+                title: globalize.translate('HeaderPlaybackError')
+            });
+            return Promise.reject();
+            // END Patches for MPV Shim
+
             if (options.fullscreen) {
                 loading.show();
             }
