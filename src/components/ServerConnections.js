@@ -72,7 +72,6 @@ import { playbackManager } from '../components/playback/playbackmanager';
 
     ApiClient.prototype.joinSyncPlayGroup = function(options = {}) {
         return new Promise((resolve) => {
-            group_id = options.GroupId;
             // Syncplay Join Group
             var xhr = new XMLHttpRequest();
             xhr.open('POST', "/mpv_shim_syncplay_join", true);
