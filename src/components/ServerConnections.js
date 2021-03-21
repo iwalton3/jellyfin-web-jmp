@@ -5,7 +5,7 @@ import { setUserInfo } from '../scripts/settings/userSettings';
 
 // BEGIN Patches for MPV Shim
 // It's got a new home!
-import { playbackManager } from '../components/playback/playbackmanager';
+/*import { playbackManager } from '../components/playback/playbackmanager';
 (function() {
     let oldLogout = ApiClient.prototype.logout;
     ApiClient.prototype.logout = function() {
@@ -80,7 +80,7 @@ import { playbackManager } from '../components/playback/playbackmanager';
             resolve();
         })
     };
-})()
+})()*/
 // END Patches for MPV Shim
 
 class ServerConnections extends ConnectionManager {

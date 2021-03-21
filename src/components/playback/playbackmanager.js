@@ -221,7 +221,7 @@ function getParam(name, url) {
 }
 
 function isAutomaticPlayer(player) {
-    if (player.isLocalPlayer) {
+    if (player.isLocalPlayer || player.name == "shimplayer") {
         return true;
     }
 
@@ -874,13 +874,19 @@ class PlaybackManager {
 
                     targets.push({
                         name: globalize.translate('HeaderMyDevice'),
-                        id: 'localplayer',
-                        playerName: 'localplayer',
-                        playableMediaTypes: ['Audio', 'Video', 'Photo', 'Book'],
-                        isLocalPlayer: true,
-                        supportedCommands: self.getSupportedCommands({
-                            isLocalPlayer: true
-                        }),
+                        id: 'shimplayer',
+                        playerName: 'shimplayer',
+                        playableMediaTypes: ['Video'],
+                        isLocalPlayer: false,
+                        supportedCommands: [
+                            "MoveUp","MoveDown","MoveLeft","MoveRight","Select",
+                            "Back","ToggleFullscreen",
+                            "GoHome","GoToSettings","TakeScreenshot",
+                            "VolumeUp","VolumeDown","ToggleMute",
+                            "SetAudioStreamIndex","SetSubtitleStreamIndex",
+                            "Mute","Unmute","SetVolume","DisplayContent",
+                            "Play","Playstate","PlayNext","PlayMediaSource",
+                        ],
                         user: user
                     });
 
@@ -1894,12 +1900,12 @@ class PlaybackManager {
 
             // BEGIN Patches for MPV Shim
             // Explicitly break non-MPV playback
-            alert({
+            /*alert({
                 text: "MPV Shim's player backend is not connected. This could be caused by " +
                         "many things. Try logging out/in again and making sure websockets work.",
                 title: globalize.translate('HeaderPlaybackError')
             });
-            return Promise.reject();
+            return Promise.reject();*/
             // END Patches for MPV Shim
 
             if (options.fullscreen) {
