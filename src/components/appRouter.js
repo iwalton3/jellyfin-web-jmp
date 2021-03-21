@@ -492,11 +492,11 @@ class AppRouter {
     }
 
     onAppResume() {
-        const apiClient = ServerConnections.currentApiClient();
+        /*const apiClient = ServerConnections.currentApiClient();
 
         if (apiClient) {
             apiClient.ensureWebSocket();
-        }
+        }*/
     }
 
     authenticate(ctx, route, callback) {

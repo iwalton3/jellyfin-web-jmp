@@ -46,7 +46,7 @@ try {
     const apiClient = ServerConnections.currentApiClient();
 
     if (apiClient && supported()) {
-        Events.on(apiClient, 'websocketopen', onOpen);
+        //Events.on(apiClient, 'websocketopen', onOpen);
     }
 } catch (ex) {
     console.warn('Could not get current apiClient', ex);

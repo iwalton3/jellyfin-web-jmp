@@ -12,6 +12,23 @@ import * as Screenfull from 'screenfull';
 import ServerConnections from '../ServerConnections';
 import alert from '../alert';
 
+const shimTarget = {
+    name: globalize.translate('HeaderMyDevice'),
+    id: 'shimplayer',
+    playerName: 'shimplayer',
+    playableMediaTypes: ['Video', 'Audio'],
+    isLocalPlayer: false,
+    supportedCommands: [
+        "MoveUp","MoveDown","MoveLeft","MoveRight","Select",
+        "Back","ToggleFullscreen",
+        "GoHome","GoToSettings","TakeScreenshot",
+        "VolumeUp","VolumeDown","ToggleMute",
+        "SetAudioStreamIndex","SetSubtitleStreamIndex",
+        "Mute","Unmute","SetVolume","DisplayContent",
+        "Play","Playstate","PlayNext","PlayMediaSource",
+    ]
+};
+
 function enableLocalPlaylistManagement(player) {
     if (player.getPlaylist) {
         return false;
@@ -872,23 +889,7 @@ class PlaybackManager {
                 return ServerConnections.currentApiClient().getCurrentUser().then(function (user) {
                     const targets = [];
 
-                    targets.push({
-                        name: globalize.translate('HeaderMyDevice'),
-                        id: 'shimplayer',
-                        playerName: 'shimplayer',
-                        playableMediaTypes: ['Video'],
-                        isLocalPlayer: false,
-                        supportedCommands: [
-                            "MoveUp","MoveDown","MoveLeft","MoveRight","Select",
-                            "Back","ToggleFullscreen",
-                            "GoHome","GoToSettings","TakeScreenshot",
-                            "VolumeUp","VolumeDown","ToggleMute",
-                            "SetAudioStreamIndex","SetSubtitleStreamIndex",
-                            "Mute","Unmute","SetVolume","DisplayContent",
-                            "Play","Playstate","PlayNext","PlayMediaSource",
-                        ],
-                        user: user
-                    });
+                    targets.push(shimTarget);
 
                     for (let i = 0; i < responses.length; i++) {
                         const subTargets = responses[i];
@@ -1900,12 +1901,12 @@ class PlaybackManager {
 
             // BEGIN Patches for MPV Shim
             // Explicitly break non-MPV playback
-            /*alert({
+            alert({
                 text: "MPV Shim's player backend is not connected. This could be caused by " +
                         "many things. Try logging out/in again and making sure websockets work.",
                 title: globalize.translate('HeaderPlaybackError')
             });
-            return Promise.reject();*/
+            return Promise.reject();
             // END Patches for MPV Shim
 
             if (options.fullscreen) {
@@ -3112,6 +3113,10 @@ class PlaybackManager {
 
             if (player.isLocalPlayer !== false) {
                 player.isLocalPlayer = true;
+            }
+
+            if (player.name == "shimplayer") {
+                setCurrentPlayerInternal(player, shimTarget);
             }
 
             player.currentState = {};

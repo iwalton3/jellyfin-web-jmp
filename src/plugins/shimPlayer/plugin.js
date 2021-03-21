@@ -268,7 +268,7 @@ class ShimPlayer {
 
     canPlayMediaType(mediaType) {
         mediaType = (mediaType || '').toLowerCase();
-        return mediaType === 'audio' || mediaType === 'video';
+        return mediaType === 'video' || mediaType === 'audio';
     }
 
     canQueueMediaType(mediaType) {
