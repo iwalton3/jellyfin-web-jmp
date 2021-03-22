@@ -4,7 +4,7 @@ import Dashboard from '../scripts/clientUtils';
 import { setUserInfo } from '../scripts/settings/userSettings';
 
 // BEGIN Patches for MPV Shim
-// It's got a new home!
+// I thought this approach would help things. But evidently not.
 (function() {
     let wsOpen = false;
 
@@ -24,7 +24,23 @@ import { setUserInfo } from '../scripts/settings/userSettings';
         Events.trigger(this, 'websocketclose');
     };
 
+    ApiClient.prototype.sendWebSocketMessage = function(name, data) {
+        // lies
+        console.log(["wssend", name, data]);
+    };
+
+    ApiClient.prototype.reportCapabilities = function() {
+        // more lies
+        return Promise.resolve();
+    }
+
     ApiClient.prototype.isWebSocketOpenOrConnecting = function() {
+        // more lies
+        return wsOpen;
+    }
+
+    ApiClient.prototype.isWebSocketOpen = function() {
+        // more lies
         return wsOpen;
     }
 

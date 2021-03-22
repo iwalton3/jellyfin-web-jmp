@@ -40,7 +40,7 @@ class GroupSelectionMenu {
                     };
                 });
 
-                if (policy.SyncPlayAccess === 'CreateAndJoinGroups') {
+                /*if (policy.SyncPlayAccess === 'CreateAndJoinGroups') {
                     menuItems.push({
                         name: globalize.translate('LabelSyncPlayNewGroup'),
                         icon: 'add',
@@ -48,11 +48,11 @@ class GroupSelectionMenu {
                         selected: true,
                         secondaryText: globalize.translate('LabelSyncPlayNewGroupDescription')
                     });
-                }
+                }*/
 
-                if (menuItems.length === 0 && policy.SyncPlayAccess === 'JoinGroups') {
+                if (menuItems.length === 0) {
                     toast({
-                        text: globalize.translate('MessageSyncPlayCreateGroupDenied')
+                        text: globalize.translate('MessageSyncPlayNoGroupsAvailable')
                     });
                     loading.hide();
                     return;
