@@ -2,86 +2,7 @@ import { ConnectionManager, Credentials, ApiClient, Events } from 'jellyfin-apic
 import { appHost } from './apphost';
 import Dashboard from '../scripts/clientUtils';
 import { setUserInfo } from '../scripts/settings/userSettings';
-
-// BEGIN Patches for MPV Shim
-// It's got a new home!
-import { playbackManager } from '../components/playback/playbackmanager';
-(function() {
-    let oldLogout = ApiClient.prototype.logout;
-    ApiClient.prototype.logout = function() {
-        // Logout Callback
-        var xhr = new XMLHttpRequest();
-        xhr.open('POST', "/destroy_session", true);
-        xhr.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
-        xhr.send("{}");
-
-        return oldLogout.bind(this)();
-    }
-
-    let oldAuthenticateUserByName = ApiClient.prototype.authenticateUserByName;
-    ApiClient.prototype.authenticateUserByName = function(name, password) {
-        // Password Provider
-        return new Promise((resolve, reject) => {
-            var xhr = new XMLHttpRequest();
-            xhr.open('POST', "/mpv_shim_password", true);
-            xhr.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
-            xhr.onloadend = (result) => {
-                var res = JSON.parse(result.target.response);
-                if (!res.success) {
-                    alert("MPV Shim Login Failed");
-                    reject();
-                }
-                oldAuthenticateUserByName.bind(this)(name, password).then(resolve).catch(reject);
-            };
-            xhr.onerror = () => {
-                reject();
-            }
-            xhr.send(JSON.stringify({
-                server: this.serverAddress(),
-                username: name,
-                password: password
-            }));
-        })
-    }
-
-    let oldOpenWebSocket = ApiClient.prototype.openWebSocket;
-    ApiClient.prototype.openWebSocket = function() {
-        oldOpenWebSocket.bind(this)();
-        let oldOnOpen = this._webSocket.onopen;
-        function onOpen() {
-            // Auto-Connect
-            var xhr = new XMLHttpRequest();
-            xhr.open('POST', "/mpv_shim_id", true);
-            xhr.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
-            xhr.onloadend = function (result) {
-                var res = JSON.parse(result.target.response);
-                playbackManager.getTargets().then(function (targets) {
-                    for (var i = 0; i < targets.length; i++) {
-                        if (targets[i].appName == res.appName &&
-                            targets[i].deviceName == res.deviceName)
-                            playbackManager.trySetActivePlayer(targets[i].playerName, targets[i]);
-                    }
-                });
-            };
-            xhr.send("{}");
-
-            oldOnOpen();
-        }
-        this._webSocket.onopen = onOpen;
-    };
-
-    ApiClient.prototype.joinSyncPlayGroup = function(options = {}) {
-        return new Promise((resolve) => {
-            // Syncplay Join Group
-            var xhr = new XMLHttpRequest();
-            xhr.open('POST', "/mpv_shim_syncplay_join", true);
-            xhr.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
-            xhr.send(JSON.stringify(options));
-            resolve();
-        })
-    };
-})()
-// END Patches for MPV Shim
+import { playbackManager } from './playback/playbackmanager';
 
 class ServerConnections extends ConnectionManager {
     constructor() {
@@ -150,10 +71,154 @@ const credentials = new Credentials();
 
 const capabilities = Dashboard.capabilities(appHost);
 
-export default new ServerConnections(
+const serverConnections = new ServerConnections(
     credentials,
     appHost.appName(),
     appHost.appVersion(),
     appHost.deviceName(),
     appHost.deviceId(),
     capabilities);
+
+export default serverConnections;
+
+// BEGIN Patches for MPV Shim
+// I thought this approach would help things. But evidently not.
+
+let shimEventCallback = () => {};
+let mainEventCallback = () => {};
+
+export const setShimEventCallback = (callback) => {
+    shimEventCallback = callback;
+};
+
+export const shimRequest = (url, options = {}) => new Promise((resolve, reject) => {
+    var xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = (e) => {
+        if (xhr.readyState === 4 && xhr.status !== 200) {
+            reject(xhr.status);
+        }
+    };
+    xhr.ontimeout = () => {
+        reject('timeout');
+    };
+    xhr.onloadend = (result) => {
+        var res = JSON.parse(result.target.response);
+        resolve(res);
+    };
+    xhr.open('POST', url, true);
+    xhr.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
+    xhr.send(JSON.stringify(options));
+});
+
+const setMainEventCallback = (callback) => {
+    mainEventCallback = callback;
+}
+
+let hasStartedPoll = false;
+
+const triggerPoll = async () => {
+    try {
+        const msg = await shimRequest("/mpv_shim_event");
+
+        if (msg.dest == "ws") 
+            mainEventCallback(msg);
+        else if (msg.dest == "player") 
+            shimEventCallback(msg);
+        triggerPoll();
+    } catch (e) {
+        console.error("Shim poll failed.", e);
+        setTimeout(triggerPoll, 5000);
+    }
+};
+
+const shimTarget = {
+    name: 'shimplayer',
+    id: 'shimplayer',
+    playerName: 'shimplayer',
+    playableMediaTypes: ['Video', 'Audio'],
+    isLocalPlayer: false,
+    supportedCommands: [
+        "MoveUp","MoveDown","MoveLeft","MoveRight","Select",
+        "Back","ToggleFullscreen",
+        "GoHome","GoToSettings","TakeScreenshot",
+        "VolumeUp","VolumeDown","ToggleMute",
+        "SetAudioStreamIndex","SetSubtitleStreamIndex",
+        "Mute","Unmute","SetVolume","DisplayContent",
+        "Play","Playstate","PlayNext","PlayMediaSource",
+    ]
+};
+
+// We need to proxy all websocket events through the shim.
+ApiClient.prototype.openWebSocket = function() {
+    console.log("Handle web socket open.");
+    this.wsOpen = true;
+    
+    setMainEventCallback((msg) => {
+        Events.trigger(this, 'message', [msg]);
+    });
+
+    serverConnections.user(this).then(user => {
+        shimRequest("/mpv_shim_session", {
+            address: this.serverAddress(),
+            AccessToken: this.serverInfo().AccessToken,
+            UserId: this.getCurrentUserId(),
+            Name: this.serverName(),
+            Id: this.serverId(),
+            username: user.localUser.Name,
+            DateLastAccessed: (new Date()).toISOString(),
+            uuid: this.serverId()
+        }).catch(() => {
+            alert("MPV Shim Session Fail");
+        });
+    });
+
+    const player = playbackManager.getPlayers().filter(p => p.name == "shimplayer")[0];
+    playbackManager.setActivePlayer(player, shimTarget);
+
+    if (!hasStartedPoll) {
+        hasStartedPoll = true;
+        triggerPoll();
+    }
+
+    // lies
+    Events.trigger(this, 'websocketopen');
+};
+
+ApiClient.prototype.closeWebSocket = function() {
+    console.log("Handle web socket close.");
+    this.wsOpen = false;
+    setMainEventCallback(() => {});
+    shimRequest("/mpv_shim_teardown");
+
+    // lies
+    Events.trigger(this, 'websocketclose');
+};
+
+ApiClient.prototype.sendWebSocketMessage = function(name, data) {
+    // lies
+    console.log(["wssend", name, data]);
+};
+
+ApiClient.prototype.reportCapabilities = function() {
+    // more lies
+    return Promise.resolve();
+}
+
+ApiClient.prototype.isWebSocketOpenOrConnecting = function() {
+    // more lies
+    return this.wsOpen;
+}
+
+ApiClient.prototype.isWebSocketOpen = function() {
+    // more lies
+    return this.wsOpen;
+}
+
+ApiClient.prototype.joinSyncPlayGroup = function(options = {}) {
+    return new Promise((resolve) => {
+        // Syncplay Join Group
+        shimRequest("/mpv_shim_syncplay_join", options);
+        resolve();
+    });
+};
+// END Patches for MPV Shim
