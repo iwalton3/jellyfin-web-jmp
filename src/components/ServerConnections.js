@@ -4,88 +4,15 @@ import Dashboard from '../scripts/clientUtils';
 import { setUserInfo } from '../scripts/settings/userSettings';
 import { playbackManager } from './playback/playbackmanager';
 
-class ServerConnections extends ConnectionManager {
-    constructor() {
-        super(...arguments);
-        this.localApiClient = null;
-
-        Events.on(this, 'localusersignedout', function () {
-            setUserInfo(null, null);
-        });
-    }
-
-    initApiClient(server) {
-        console.debug('creating ApiClient singleton');
-
-        const apiClient = new ApiClient(
-            server,
-            appHost.appName(),
-            appHost.appVersion(),
-            appHost.deviceName(),
-            appHost.deviceId()
-        );
-
-        apiClient.enableAutomaticNetworking = false;
-        apiClient.manualAddressOnly = true;
-
-        this.addApiClient(apiClient);
-
-        this.setLocalApiClient(apiClient);
-
-        console.debug('loaded ApiClient singleton');
-    }
-
-    setLocalApiClient(apiClient) {
-        if (apiClient) {
-            this.localApiClient = apiClient;
-            window.ApiClient = apiClient;
-        }
-    }
-
-    getLocalApiClient() {
-        return this.localApiClient;
-    }
-
-    currentApiClient() {
-        let apiClient = this.getLocalApiClient();
-
-        if (!apiClient) {
-            const server = this.getLastUsedServer();
-
-            if (server) {
-                apiClient = this.getApiClient(server.Id);
-            }
-        }
-
-        return apiClient;
-    }
-
-    onLocalUserSignedIn(user) {
-        const apiClient = this.getApiClient(user.ServerId);
-        this.setLocalApiClient(apiClient);
-        return setUserInfo(user.Id, apiClient);
-    }
-}
-
-const credentials = new Credentials();
-
-const capabilities = Dashboard.capabilities(appHost);
-
-const serverConnections = new ServerConnections(
-    credentials,
-    appHost.appName(),
-    appHost.appVersion(),
-    appHost.deviceName(),
-    appHost.deviceId(),
-    capabilities);
-
-export default serverConnections;
-
 // BEGIN Patches for MPV Shim
 // I thought this approach would help things. But evidently not.
 
 let shimEventCallback = () => {};
 let mainEventCallback = () => {};
+
+const clientData = JSON.parse(window.atob(document.getElementById("clientData").innerHTML));
+
+console.warn(clientData);
 
 export const setShimEventCallback = (callback) => {
     shimEventCallback = callback;
@@ -149,40 +76,6 @@ const shimTarget = {
 };
 
 // We need to proxy all websocket events through the shim.
-ApiClient.prototype.openWebSocket = function() {
-    console.log("Handle web socket open.");
-    this.wsOpen = true;
-    
-    setMainEventCallback((msg) => {
-        Events.trigger(this, 'message', [msg]);
-    });
-
-    serverConnections.user(this).then(user => {
-        shimRequest("/mpv_shim_session", {
-            address: this.serverAddress(),
-            AccessToken: this.serverInfo().AccessToken,
-            UserId: this.getCurrentUserId(),
-            Name: this.serverName(),
-            Id: this.serverId(),
-            username: user.localUser.Name,
-            DateLastAccessed: (new Date()).toISOString(),
-            uuid: this.serverId()
-        }).catch(() => {
-            alert("MPV Shim Session Fail");
-        });
-    });
-
-    const player = playbackManager.getPlayers().filter(p => p.name == "shimplayer")[0];
-    playbackManager.setActivePlayer(player, shimTarget);
-
-    if (!hasStartedPoll) {
-        hasStartedPoll = true;
-        triggerPoll();
-    }
-
-    // lies
-    Events.trigger(this, 'websocketopen');
-};
 
 ApiClient.prototype.closeWebSocket = function() {
     console.log("Handle web socket close.");
@@ -222,3 +115,117 @@ ApiClient.prototype.joinSyncPlayGroup = function(options = {}) {
     });
 };
 // END Patches for MPV Shim
+
+class ServerConnections extends ConnectionManager {
+    constructor() {
+        super(...arguments);
+        this.localApiClient = null;
+
+        Events.on(this, 'localusersignedout', function () {
+            setUserInfo(null, null);
+        });
+    }
+
+    initApiClient(server) {
+        console.debug('creating ApiClient singleton');
+
+        const apiClient = new ApiClient(
+            server,
+            clientData.appName,
+            clientData.appVersion,
+            clientData.deviceName,
+            clientData.deviceId
+        );
+
+        apiClient.enableAutomaticNetworking = false;
+        apiClient.manualAddressOnly = true;
+
+        this.addApiClient(apiClient);
+
+        this.setLocalApiClient(apiClient);
+
+        console.debug('loaded ApiClient singleton');
+    }
+
+    setLocalApiClient(apiClient) {
+        if (apiClient) {
+            this.localApiClient = apiClient;
+            window.ApiClient = apiClient;
+        }
+    }
+
+    getLocalApiClient() {
+        return this.localApiClient;
+    }
+
+    currentApiClient() {
+        let apiClient = this.getLocalApiClient();
+
+        if (!apiClient) {
+            const server = this.getLastUsedServer();
+
+            if (server) {
+                apiClient = this.getApiClient(server.Id);
+            }
+        }
+
+        return apiClient;
+    }
+
+    onLocalUserSignedIn(user) {
+        const apiClient = this.getApiClient(user.ServerId);
+        this.setLocalApiClient(apiClient);
+        return setUserInfo(user.Id, apiClient);
+    }
+}
+
+const credentials = new Credentials();
+
+const capabilities = Dashboard.capabilities(appHost);
+
+const serverConnections = new ServerConnections(
+    credentials,
+    clientData.appName,
+    clientData.appVersion,
+    clientData.deviceName,
+    clientData.deviceId,
+    capabilities);
+
+export default serverConnections;
+
+// More Patches
+
+ApiClient.prototype.openWebSocket = function() {
+    console.log("Handle web socket open.");
+    this.wsOpen = true;
+    
+    setMainEventCallback((msg) => {
+        Events.trigger(this, 'message', [msg]);
+    });
+
+    serverConnections.user(this).then(user => {
+        shimRequest("/mpv_shim_session", {
+            address: this.serverAddress(),
+            AccessToken: this.serverInfo().AccessToken,
+            UserId: this.getCurrentUserId(),
+            Name: this.serverName(),
+            Id: this.serverId(),
+            username: user.localUser.Name,
+            DateLastAccessed: (new Date()).toISOString(),
+            uuid: this.serverId()
+        }).catch(() => {
+            alert("MPV Shim Session Fail");
+        });
+    });
+
+    const player = playbackManager.getPlayers().filter(p => p.name == "shimplayer")[0];
+    playbackManager.setActivePlayer(player, shimTarget);
+
+    if (!hasStartedPoll) {
+        hasStartedPoll = true;
+        triggerPoll();
+    }
+
+    // lies
+    Events.trigger(this, 'websocketopen');
+};
