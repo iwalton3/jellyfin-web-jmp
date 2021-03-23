@@ -1,7 +1,16 @@
 import { playbackManager } from '../../components/playback/playbackmanager';
 import { Events } from 'jellyfin-apiclient';
-import serverNotifications from '../../scripts/serverNotifications';
-import ServerConnections from '../../components/ServerConnections';
+import ServerConnections, { setShimEventCallback, shimRequest } from '../../components/ServerConnections';
+
+const shimMessage = (api, name, payload = {}) => {
+    payload.ControllingUserId = api.getCurrentUserId();
+    payload.ServerId = api.serverId();
+
+    return shimRequest("/mpv_shim_message", {
+        name,
+        payload
+    });
+}
 
 function getActivePlayerId() {
     const info = playbackManager.getPlayerInfo();
@@ -9,16 +18,12 @@ function getActivePlayerId() {
 }
 
 function sendPlayCommand(apiClient, options, playType) {
-    console.warn(["sendPlayCommand", options, playType]);
-    const sessionId = getActivePlayerId();
-
     const ids = options.ids || options.items.map(function (i) {
         return i.Id;
     });
 
     const remoteOptions = {
-        ItemIds: ids.join(','),
-
+        ItemIds: ids,
         PlayCommand: playType
     };
 
@@ -42,14 +47,12 @@ function sendPlayCommand(apiClient, options, playType) {
         remoteOptions.StartIndex = options.startIndex;
     }
 
-    return apiClient.sendPlayCommand(sessionId, remoteOptions);
+    return shimMessage(apiClient, "Play", remoteOptions);
 }
 
-function sendPlayStateCommand(apiClient, command, options) {
-    console.warn(["sendPlayStateCommand", command, options]);
-    const sessionId = getActivePlayerId();
-
-    apiClient.sendPlayStateCommand(sessionId, command, options);
+function sendPlayStateCommand(apiClient, command, options = {}) {
+    options.Command = command;
+    shimMessage(apiClient, "Playstate", options);
 }
 
 function getCurrentApiClient(instance) {
@@ -63,7 +66,6 @@ function getCurrentApiClient(instance) {
 }
 
 function sendCommandByName(instance, name, options) {
-    console.warn(["sendCommandByName", name, options]);
     const command = {
         Name: name
     };
@@ -72,49 +74,23 @@ function sendCommandByName(instance, name, options) {
         command.Arguments = options;
     }
 
-    instance.sendCommand(command);
+    return shimMessage(getCurrentApiClient(instance), "GeneralCommand", command);
 }
 
-function unsubscribeFromPlayerUpdates(instance) {
-    instance.isUpdating = true;
-
-    const apiClient = getCurrentApiClient(instance);
-    apiClient.sendMessage('SessionsStop');
-    if (instance.pollInterval) {
-        clearInterval(instance.pollInterval);
-        instance.pollInterval = null;
-    }
-}
-
-function processUpdatedSessions(instance, sessions, apiClient) {
+function processUpdatedSessions(instance, session, apiClient) {
     const serverId = apiClient.serverId();
 
-    sessions.map(function (s) {
-        if (s.NowPlayingItem) {
-            s.NowPlayingItem.ServerId = serverId;
-        }
-    });
+    if (session.NowPlayingItem) {
+        session.NowPlayingItem.ServerId = serverId;
+    }
 
-    const currentTargetId = getActivePlayerId();
+    normalizeImages(session, apiClient);
 
-    const session = sessions.filter(function (s) {
-        return s.Id === currentTargetId;
-    })[0];
+    const eventNames = getChangedEvents(instance.lastPlayerData, session);
+    instance.lastPlayerData = session;
 
-    if (session) {
-        console.warn(["sessionUpd", session]);
-        normalizeImages(session, apiClient);
-
-        const eventNames = getChangedEvents(instance.lastPlayerData, session);
-        instance.lastPlayerData = session;
-
-        for (let i = 0, length = eventNames.length; i < length; i++) {
-            Events.trigger(instance, eventNames[i], [session]);
-        }
-    } else {
-        instance.lastPlayerData = session;
-
-        playbackManager.setDefaultPlayerActive();
+    for (let i = 0, length = eventNames.length; i < length; i++) {
+        Events.trigger(instance, eventNames[i], [session]);
     }
 }
 
@@ -135,28 +111,6 @@ function getChangedEvents(state1, state2) {
     names.push('pause');
 
     return names;
-}
-
-function onPollIntervalFired() {
-    const instance = this;
-    const apiClient = getCurrentApiClient(instance);
-    if (!apiClient.isMessageChannelOpen()) {
-        apiClient.getSessions().then(function (sessions) {
-            processUpdatedSessions(instance, sessions, apiClient);
-        });
-    }
-}
-
-function subscribeToPlayerUpdates(instance) {
-    instance.isUpdating = true;
-
-    const apiClient = getCurrentApiClient(instance);
-    apiClient.sendMessage('SessionsStart', '100,800');
-    if (instance.pollInterval) {
-        clearInterval(instance.pollInterval);
-        instance.pollInterval = null;
-    }
-    instance.pollInterval = setInterval(onPollIntervalFired.bind(instance), 5000);
 }
 
 function normalizeImages(state, apiClient) {
@@ -193,25 +147,16 @@ class ShimPlayer {
     }
 
     beginPlayerUpdates() {
-        this.playerListenerCount = this.playerListenerCount || 0;
+        const apiClient = getCurrentApiClient(this);
 
-        if (this.playerListenerCount <= 0) {
-            this.playerListenerCount = 0;
-
-            subscribeToPlayerUpdates(this);
-        }
-
-        this.playerListenerCount++;
+        setShimEventCallback((session) => {
+            processUpdatedSessions(this, session, apiClient);
+        });
     }
 
     endPlayerUpdates() {
-        this.playerListenerCount = this.playerListenerCount || 0;
-        this.playerListenerCount--;
-
-        if (this.playerListenerCount <= 0) {
-            unsubscribeFromPlayerUpdates(this);
-            this.playerListenerCount = 0;
-        }
+        this.isUpdating = true;
+        setShimEventCallback(() => {});
     }
 
     getPlayerState() {
@@ -219,11 +164,7 @@ class ShimPlayer {
     }
 
     sendCommand(command) {
-        console.warn(["sendCommand", command]);
-        const sessionId = getActivePlayerId();
-
-        const apiClient = getCurrentApiClient(this);
-        apiClient.sendCommand(sessionId, command);
+        sendCommandByName(this, command);
     }
 
     async play(options) {
@@ -276,19 +217,19 @@ class ShimPlayer {
     }
 
     stop() {
-        sendPlayStateCommand(getCurrentApiClient(this), 'stop');
+        sendPlayStateCommand(getCurrentApiClient(this), 'Stop');
     }
 
     nextTrack() {
-        sendPlayStateCommand(getCurrentApiClient(this), 'nextTrack');
+        sendPlayStateCommand(getCurrentApiClient(this), 'NextTrack');
     }
 
     previousTrack() {
-        sendPlayStateCommand(getCurrentApiClient(this), 'previousTrack');
+        sendPlayStateCommand(getCurrentApiClient(this), 'PreviousTrack');
     }
 
     seek(positionTicks) {
-        sendPlayStateCommand(getCurrentApiClient(this), 'seek',
+        sendPlayStateCommand(getCurrentApiClient(this), 'Seek',
             {
                 SeekPositionTicks: positionTicks
             });

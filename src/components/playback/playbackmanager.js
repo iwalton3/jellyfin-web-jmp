@@ -12,23 +12,6 @@ import * as Screenfull from 'screenfull';
 import ServerConnections from '../ServerConnections';
 import alert from '../alert';
 
-const shimTarget = {
-    name: globalize.translate('HeaderMyDevice'),
-    id: 'shimplayer',
-    playerName: 'shimplayer',
-    playableMediaTypes: ['Video', 'Audio'],
-    isLocalPlayer: false,
-    supportedCommands: [
-        "MoveUp","MoveDown","MoveLeft","MoveRight","Select",
-        "Back","ToggleFullscreen",
-        "GoHome","GoToSettings","TakeScreenshot",
-        "VolumeUp","VolumeDown","ToggleMute",
-        "SetAudioStreamIndex","SetSubtitleStreamIndex",
-        "Mute","Unmute","SetVolume","DisplayContent",
-        "Play","Playstate","PlayNext","PlayMediaSource",
-    ]
-};
-
 function enableLocalPlaylistManagement(player) {
     if (player.getPlaylist) {
         return false;
@@ -238,7 +221,7 @@ function getParam(name, url) {
 }
 
 function isAutomaticPlayer(player) {
-    if (player.isLocalPlayer || player.name == "shimplayer") {
+    if (player.isLocalPlayer) {
         return true;
     }
 
@@ -889,7 +872,17 @@ class PlaybackManager {
                 return ServerConnections.currentApiClient().getCurrentUser().then(function (user) {
                     const targets = [];
 
-                    targets.push(shimTarget);
+                    targets.push({
+                        name: globalize.translate('HeaderMyDevice'),
+                        id: 'localplayer',
+                        playerName: 'localplayer',
+                        playableMediaTypes: ['Audio', 'Video', 'Photo', 'Book'],
+                        isLocalPlayer: true,
+                        supportedCommands: self.getSupportedCommands({
+                            isLocalPlayer: true
+                        }),
+                        user: user
+                    });
 
                     for (let i = 0; i < responses.length; i++) {
                         const subTargets = responses[i];
@@ -3113,10 +3106,6 @@ class PlaybackManager {
 
             if (player.isLocalPlayer !== false) {
                 player.isLocalPlayer = true;
-            }
-
-            if (player.name == "shimplayer") {
-                setCurrentPlayerInternal(player, shimTarget);
             }
 
             player.currentState = {};

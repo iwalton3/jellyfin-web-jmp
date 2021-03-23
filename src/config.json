@@ -28,6 +28,7 @@
     "playAccessValidation/plugin",
     "experimentalWarnings/plugin",
     "htmlAudioPlayer/plugin",
+    "htmlVideoPlayer/plugin",
     "shimPlayer/plugin",
     "photoPlayer/plugin",
     "comicsPlayer/plugin",
