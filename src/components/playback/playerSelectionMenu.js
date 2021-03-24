@@ -85,7 +85,7 @@ export function show(button) {
     const currentPlayerInfo = playbackManager.getPlayerInfo();
 
     if (currentPlayerInfo) {
-        if (!currentPlayerInfo.isLocalPlayer) {
+        if (!(currentPlayerInfo.isLocalPlayer || currentPlayerInfo.id == "mpv")) {
             showActivePlayerMenu(currentPlayerInfo);
             return;
         }

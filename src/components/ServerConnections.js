@@ -3,16 +3,15 @@ import { appHost } from './apphost';
 import Dashboard from '../scripts/clientUtils';
 import { setUserInfo } from '../scripts/settings/userSettings';
 import { playbackManager } from './playback/playbackmanager';
+import globalize from '../scripts/globalize';
 
 // BEGIN Patches for MPV Shim
 // I thought this approach would help things. But evidently not.
 
 let shimEventCallback = () => {};
-let mainEventCallback = () => {};
+let mainEventCallbacks = {};
 
 const clientData = JSON.parse(window.atob(document.getElementById("clientData").innerHTML));
-
-console.warn(clientData);
 
 export const setShimEventCallback = (callback) => {
     shimEventCallback = callback;
@@ -37,8 +36,8 @@ export const shimRequest = (url, options = {}) => new Promise((resolve, reject) 
     xhr.send(JSON.stringify(options));
 });
 
-const setMainEventCallback = (callback) => {
-    mainEventCallback = callback;
+const setMainEventCallback = (ServerId, callback) => {
+    mainEventCallbacks[ServerId] = callback;
 }
 
 let hasStartedPoll = false;
@@ -47,8 +46,8 @@ const triggerPoll = async () => {
     try {
         const msg = await shimRequest("/mpv_shim_event");
 
-        if (msg.dest == "ws") 
-            mainEventCallback(msg);
+        if (msg.dest == "ws" && mainEventCallbacks.hasOwnProperty(msg.ServerId))
+            mainEventCallbacks[msg.ServerId](msg);
         else if (msg.dest == "player") 
             shimEventCallback(msg);
         triggerPoll();
@@ -58,10 +57,10 @@ const triggerPoll = async () => {
     }
 };
 
-const shimTarget = {
-    name: 'shimplayer',
-    id: 'shimplayer',
-    playerName: 'shimplayer',
+export const shimTarget = () => ({
+    name: globalize.translate('HeaderMyDevice'),
+    id: 'mpv',
+    playerName: 'mpv',
     playableMediaTypes: ['Video', 'Audio'],
     isLocalPlayer: false,
     supportedCommands: [
@@ -73,23 +72,27 @@ const shimTarget = {
         "Mute","Unmute","SetVolume","DisplayContent",
         "Play","Playstate","PlayNext","PlayMediaSource",
     ]
-};
+});
 
 // We need to proxy all websocket events through the shim.
 
 ApiClient.prototype.closeWebSocket = function() {
     console.log("Handle web socket close.");
     this.wsOpen = false;
-    setMainEventCallback(() => {});
+    setMainEventCallback(this.serverId(), () => {});
     shimRequest("/mpv_shim_teardown");
 
     // lies
     Events.trigger(this, 'websocketclose');
 };
 
-ApiClient.prototype.sendWebSocketMessage = function(name, data) {
+ApiClient.prototype.sendWebSocketMessage = function(name, payload) {
     // lies
-    console.log(["wssend", name, data]);
+    shimRequest("/mpv_shim_wsmessage", {
+        name,
+        payload,
+        ServerId: this.serverId()
+    });
 };
 
 ApiClient.prototype.reportCapabilities = function() {
@@ -199,7 +202,7 @@ ApiClient.prototype.openWebSocket = function() {
     console.log("Handle web socket open.");
     this.wsOpen = true;
     
-    setMainEventCallback((msg) => {
+    setMainEventCallback(this.serverId(), (msg) => {
         Events.trigger(this, 'message', [msg]);
     });
 
@@ -218,8 +221,7 @@ ApiClient.prototype.openWebSocket = function() {
         });
     });
 
-    const player = playbackManager.getPlayers().filter(p => p.name == "shimplayer")[0];
-    playbackManager.setActivePlayer(player, shimTarget);
+    playbackManager.setDefaultPlayerActive();
 
     if (!hasStartedPoll) {
         hasStartedPoll = true;

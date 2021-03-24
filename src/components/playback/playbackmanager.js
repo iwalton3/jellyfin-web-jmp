@@ -9,7 +9,7 @@ import globalize from '../../scripts/globalize';
 import loading from '../loading/loading';
 import { appHost } from '../apphost';
 import * as Screenfull from 'screenfull';
-import ServerConnections from '../ServerConnections';
+import ServerConnections, { shimTarget } from '../ServerConnections';
 import alert from '../alert';
 
 function enableLocalPlaylistManagement(player) {
@@ -709,8 +709,8 @@ function getPlayerTargets(player) {
 }
 
 function sortPlayerTargets(a, b) {
-    let aVal = a.isLocalPlayer ? 0 : 1;
-    let bVal = b.isLocalPlayer ? 0 : 1;
+    let aVal = a.id == "mpv" ? 0 : 1;
+    let bVal = b.id == "mpv" ? 0 : 1;
 
     aVal = aVal.toString() + a.name;
     bVal = bVal.toString() + b.name;
@@ -872,7 +872,7 @@ class PlaybackManager {
                 return ServerConnections.currentApiClient().getCurrentUser().then(function (user) {
                     const targets = [];
 
-                    targets.push({
+                    /*targets.push({
                         name: globalize.translate('HeaderMyDevice'),
                         id: 'localplayer',
                         playerName: 'localplayer',
@@ -882,7 +882,7 @@ class PlaybackManager {
                             isLocalPlayer: true
                         }),
                         user: user
-                    });
+                    });*/
 
                     for (let i = 0; i < responses.length; i++) {
                         const subTargets = responses[i];
@@ -3704,7 +3704,8 @@ class PlaybackManager {
     }
 
     setDefaultPlayerActive() {
-        this.setActivePlayer('localplayer');
+        const player = this.getPlayers().filter(p => p.name == "mpv")[0];
+        this.setActivePlayer(player, shimTarget());
     }
 
     removeActivePlayer(name) {

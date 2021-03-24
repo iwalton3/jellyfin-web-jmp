@@ -31,7 +31,7 @@ import Headroom from 'headroom.js';
         html += '<h3 class="pageTitle"></h3>';
         html += '</div>';
         html += '<div class="headerRight">';
-        html += '<span class="headerSelectedPlayer hide"></span>';
+        html += '<span class="headerSelectedPlayer"></span>';
         html += '<button is="paper-icon-button-light" class="headerSyncButton syncButton headerButton headerButtonRight hide"><span class="material-icons sync_disabled"></span></button>';
         html += '<button is="paper-icon-button-light" class="headerAudioPlayerButton audioPlayerButton headerButton headerButtonRight hide"><span class="material-icons music_note"></span></button>';
         html += '<button is="paper-icon-button-light" class="headerCastButton castButton headerButton headerButtonRight hide"><span class="material-icons cast"></span></button>';
@@ -128,7 +128,7 @@ import Headroom from 'headroom.js';
             }
 
             if (!layoutManager.tv) {
-                //headerCastButton.classList.remove('hide');
+                headerCastButton.classList.remove('hide');
             }
 
             const policy = user.Policy ? user.Policy : user.localUser.Policy;
@@ -715,7 +715,7 @@ import Headroom from 'headroom.js';
 
         icon.classList.remove('cast_connected', 'cast');
 
-        if (info && !info.isLocalPlayer) {
+        if (info && !(info.isLocalPlayer || info.id == "mpv")) {
             icon.classList.add('cast_connected');
             headerCastButton.classList.add('castButton-active');
             context.querySelector('.headerSelectedPlayer').innerHTML = info.deviceName || info.name;

@@ -1,6 +1,6 @@
 import { playbackManager } from '../../components/playback/playbackmanager';
 import { Events } from 'jellyfin-apiclient';
-import ServerConnections, { setShimEventCallback, shimRequest } from '../../components/ServerConnections';
+import ServerConnections, { setShimEventCallback, shimRequest, shimTarget } from '../../components/ServerConnections';
 
 const shimMessage = (api, name, payload = {}) => {
     payload.ControllingUserId = api.getCurrentUserId();
@@ -140,10 +140,10 @@ class ShimPlayer {
     constructor() {
         const self = this;
 
-        this.name = 'shimplayer';
+        this.name = 'mpv';
         this.type = 'mediaplayer';
         this.isLocalPlayer = false;
-        this.id = 'shimplayer';
+        this.id = 'mpv';
     }
 
     beginPlayerUpdates() {
@@ -416,6 +416,10 @@ class ShimPlayer {
 
     tryPair(target) {
         return Promise.resolve();
+    }
+
+    getTargets() {
+        return [shimTarget()];
     }
 }
 
