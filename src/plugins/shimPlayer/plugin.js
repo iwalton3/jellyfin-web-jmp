@@ -169,6 +169,7 @@ class ShimPlayer {
 
     async play(options) {
         options = Object.assign({}, options);
+        const apiClient = getCurrentApiClient(this);
 
         if (options.items) {
             options.ids = options.items.map(function (i) {
@@ -180,7 +181,7 @@ class ShimPlayer {
 
         // playbackManager doesn't resolve the queue for remote players.
         // The server normally would.
-        const result = await playbackManager.getItemsForPlayback(options.serverId, {
+        const result = await playbackManager.getItemsForPlayback(options.serverId || apiClient.serverId(), {
             Ids: options.ids.join(',')
         });
         const items = await playbackManager.translateItemsForPlayback(result.Items, options);
@@ -188,7 +189,7 @@ class ShimPlayer {
         
         options.ids = ids;
         
-        return await sendPlayCommand(getCurrentApiClient(this), options, 'PlayNow');
+        return await sendPlayCommand(apiClient, options, 'PlayNow');
     }
 
     shuffle(item) {
