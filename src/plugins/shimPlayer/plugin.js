@@ -28,7 +28,7 @@ function sendPlayCommand(apiClient, options, playType) {
     };
 
     if (options.startPositionTicks) {
-        remoteOptions.StartPositionTicks = options.startPositionTicks;
+        remoteOptions.StartPositionTicks = Number(options.startPositionTicks);
     }
 
     if (options.mediaSourceId) {
@@ -36,15 +36,15 @@ function sendPlayCommand(apiClient, options, playType) {
     }
 
     if (options.audioStreamIndex != null) {
-        remoteOptions.AudioStreamIndex = options.audioStreamIndex;
+        remoteOptions.AudioStreamIndex = Number(options.audioStreamIndex);
     }
 
     if (options.subtitleStreamIndex != null) {
-        remoteOptions.SubtitleStreamIndex = options.subtitleStreamIndex;
+        remoteOptions.SubtitleStreamIndex = Number(options.subtitleStreamIndex);
     }
 
     if (options.startIndex != null) {
-        remoteOptions.StartIndex = options.startIndex;
+        remoteOptions.StartIndex = Number(options.startIndex);
     }
 
     return shimMessage(apiClient, "Play", remoteOptions);
