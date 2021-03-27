@@ -17,10 +17,33 @@ function getActivePlayerId() {
     return info ? info.id : null;
 }
 
-function sendPlayCommand(apiClient, options, playType) {
-    const ids = options.ids || options.items.map(function (i) {
+// https://stackoverflow.com/questions/2450954/how-to-randomize-shuffle-a-javascript-array
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+}
+
+async function sendPlayCommand(apiClient, options, playType, resolve = true) {
+    let ids = options.ids || options.items.map(function (i) {
         return i.Id;
     });
+
+    // playbackManager doesn't resolve the queue for remote players.
+    // The server normally would.
+    if (resolve) {
+        const result = await playbackManager.getItemsForPlayback(options.serverId || apiClient.serverId(), {
+            Ids: ids.join(',')
+        });
+        const items = await playbackManager.translateItemsForPlayback(result.Items, options);
+        ids = items.map((i) => i.Id);
+    }
+    
+    if (playType == "PlayShuffle") {
+        playType = "PlayNow";
+        shuffleArray(ids);
+    }
 
     const remoteOptions = {
         ItemIds: ids,
@@ -47,7 +70,7 @@ function sendPlayCommand(apiClient, options, playType) {
         remoteOptions.StartIndex = Number(options.startIndex);
     }
 
-    return shimMessage(apiClient, "Play", remoteOptions);
+    return await shimMessage(apiClient, "Play", remoteOptions);
 }
 
 function sendPlayStateCommand(apiClient, command, options = {}) {
@@ -178,16 +201,6 @@ class ShimPlayer {
 
             options.items = null;
         }
-
-        // playbackManager doesn't resolve the queue for remote players.
-        // The server normally would.
-        const result = await playbackManager.getItemsForPlayback(options.serverId || apiClient.serverId(), {
-            Ids: options.ids.join(',')
-        });
-        const items = await playbackManager.translateItemsForPlayback(result.Items, options);
-        const ids = items.map((i) => i.Id);
-        
-        options.ids = ids;
         
         return await sendPlayCommand(apiClient, options, 'PlayNow');
     }
@@ -201,11 +214,11 @@ class ShimPlayer {
     }
 
     queue(options) {
-        sendPlayCommand(getCurrentApiClient(this), options, 'PlayNext');
+        sendPlayCommand(getCurrentApiClient(this), options, 'PlayNext', false);
     }
 
     queueNext(options) {
-        sendPlayCommand(getCurrentApiClient(this), options, 'PlayLast');
+        sendPlayCommand(getCurrentApiClient(this), options, 'PlayLast', false);
     }
 
     canPlayMediaType(mediaType) {
