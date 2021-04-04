@@ -138,9 +138,9 @@ import Headroom from 'headroom.js';
             const policy = user.Policy ? user.Policy : user.localUser.Policy;
 
             const apiClient = getCurrentApiClient();
-            if (headerSyncButton && policy && policy.SyncPlayAccess !== 'None' && apiClient.isMinServerVersion('10.6.0')) {
+            /*if (headerSyncButton && policy && policy.SyncPlayAccess !== 'None' && apiClient.isMinServerVersion('10.6.0')) {
                 headerSyncButton.classList.remove('hide');
-            }
+            }*/
         } else {
             headerHomeButton.classList.add('hide');
             headerCastButton.classList.add('hide');
