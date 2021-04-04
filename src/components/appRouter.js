@@ -121,7 +121,6 @@ class AppRouter {
 
     back() {
         page.back();
-        window.channel.objects.player.stop();
     }
 
     show(path, options) {

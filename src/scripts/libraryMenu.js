@@ -76,7 +76,13 @@ import Headroom from 'headroom.js';
     }
 
     function onBackClick() {
-        appRouter.back();
+        if (skinHeader.classList.contains('osdHeader')){
+            playbackManager.stop().then(() => {
+                appRouter.back();
+            });
+        } else {
+            appRouter.back();
+        }
     }
 
     function retranslateUi() {
