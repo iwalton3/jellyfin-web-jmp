@@ -45,53 +45,11 @@ function tryRemoveElement(elem) {
     }
 
     function enableNativeTrackSupport(currentSrc, track) {
-        if (track) {
-            if (track.DeliveryMethod === 'Embed') {
-                return true;
-            }
-        }
-
-        if (browser.firefox) {
-            if ((currentSrc || '').toLowerCase().includes('.m3u8')) {
-                return false;
-            }
-        }
-
-        if (browser.ps4) {
-            return false;
-        }
-
-        if (browser.web0s) {
-            return false;
-        }
-
-        // Edge is randomly not rendering subtitles
-        if (browser.edge) {
-            return false;
-        }
-
-        if (browser.iOS) {
-            // works in the browser but not the native app
-            if ((browser.iosVersion || 10) < 10) {
-                return false;
-            }
-        }
-
-        if (track) {
-            const format = (track.Codec || '').toLowerCase();
-            if (format === 'ssa' || format === 'ass') {
-                return false;
-            }
-        }
-
         return true;
     }
 
     function requireHlsPlayer(callback) {
-        import('hls.js').then(({default: hls}) => {
-            window.Hls = hls;
-            callback();
-        });
+        callback();
     }
 
     function getMediaStreamAudioTracks(mediaSource) {
@@ -103,16 +61,6 @@ function tryRemoveElement(elem) {
     function getMediaStreamTextTracks(mediaSource) {
         return mediaSource.MediaStreams.filter(function (s) {
             return s.Type === 'Subtitle';
-        });
-    }
-
-    function zoomIn(elem) {
-        return new Promise(resolve => {
-            const duration = 240;
-            elem.style.animation = `htmlvideoplayer-zoomin ${duration}ms ease-in normal`;
-            dom.addEventListener(elem, dom.whichAnimationEvent(), resolve, {
-                once: true
-            });
         });
     }
 
@@ -258,6 +206,10 @@ function tryRemoveElement(elem) {
          */
         #lastProfile;
         /**
+         * @type {number | undefined}
+         */
+        #duration;
+        /**
          * @type {MutationObserver | IntersectionObserver | undefined} (Unclear observer typing)
          */
         #resizeObserver;
@@ -298,45 +250,6 @@ function tryRemoveElement(elem) {
             }
         }
 
-        /**
-         * @private
-         */
-        updateVideoUrl(streamInfo) {
-            const isHls = streamInfo.url.toLowerCase().includes('.m3u8');
-
-            const mediaSource = streamInfo.mediaSource;
-            const item = streamInfo.item;
-
-            // Huge hack alert. Safari doesn't seem to like if the segments aren't available right away when playback starts
-            // This will start the transcoding process before actually feeding the video url into the player
-            // Edit: Also seeing stalls from hls.js
-            if (mediaSource && item && !mediaSource.RunTimeTicks && isHls && streamInfo.playMethod === 'Transcode' && (browser.iOS || browser.osx)) {
-                const hlsPlaylistUrl = streamInfo.url.replace('master.m3u8', 'live.m3u8');
-
-                loading.show();
-
-                console.debug(`prefetching hls playlist: ${hlsPlaylistUrl}`);
-
-                return ServerConnections.getApiClient(item.ServerId).ajax({
-
-                    type: 'GET',
-                    url: hlsPlaylistUrl
-
-                }).then(function () {
-                    console.debug(`completed prefetching hls playlist: ${hlsPlaylistUrl}`);
-
-                    loading.hide();
-                    streamInfo.url = hlsPlaylistUrl;
-                }, function () {
-                    console.error(`error prefetching hls playlist: ${hlsPlaylistUrl}`);
-
-                    loading.hide();
-                });
-            } else {
-                return Promise.resolve();
-            }
-        }
-
         play(options) {
             this.#started = false;
             this.#timeUpdated = false;
@@ -344,136 +257,42 @@ function tryRemoveElement(elem) {
             this.#currentTime = null;
 
             this.resetSubtitleOffset();
-
+            loading.show();
             return this.createMediaElement(options).then(elem => {
-                return this.updateVideoUrl(options).then(() => {
-                    return this.setCurrentSrc(elem, options);
-                });
+                return this.setCurrentSrc(elem, options);
             });
         }
 
         /**
          * @private
          */
-        setSrcWithFlvJs(elem, options, url) {
-            return import('flv.js').then(({default: flvjs}) => {
-                const flvPlayer = flvjs.createPlayer({
-                        type: 'flv',
-                        url: url
-                    },
-                    {
-                        seekType: 'range',
-                        lazyLoad: false
-                    });
+        setCurrentSrc(elem, options) {
+            return new Promise((resolve) => {
+                let val = options.url;
+                console.debug(`playing url: ${val}`);
 
-                flvPlayer.attachMediaElement(elem);
-                flvPlayer.load();
+                // Convert to seconds
+                const ms = (options.playerStartPositionTicks || 0) / 10000;
 
-                this.#flvPlayer = flvPlayer;
-
-                // This is needed in setCurrentTrackElement
-                this.#currentSrc = url;
-
-                return flvPlayer.play();
-            });
-        }
-
-        /**
-         * @private
-         */
-        setSrcWithHlsJs(elem, options, url) {
-            return new Promise((resolve, reject) => {
-                requireHlsPlayer(async () => {
-                    let maxBufferLength = 30;
-                    let maxMaxBufferLength = 600;
-
-                    // Some browsers cannot handle huge fragments in high bitrate.
-                    // This issue usually happens when using HWA encoders with a high bitrate setting.
-                    // Limit the BufferLength to 6s, it works fine when playing 4k 120Mbps over HLS on chrome.
-                    // https://github.com/video-dev/hls.js/issues/876
-                    if ((browser.chrome || browser.edgeChromium || browser.firefox) && playbackManager.getMaxStreamingBitrate(this) >= 25000000) {
-                        maxBufferLength = 6;
-                        maxMaxBufferLength = 6;
+                this.#subtitleTrackIndexToSetOnPlaying = options.mediaSource.DefaultSubtitleStreamIndex == null ? -1 : options.mediaSource.DefaultSubtitleStreamIndex;
+                if (this.#subtitleTrackIndexToSetOnPlaying != null && this.#subtitleTrackIndexToSetOnPlaying >= 0) {
+                    const initialSubtitleStream = options.mediaSource.MediaStreams[this.#subtitleTrackIndexToSetOnPlaying];
+                    if (!initialSubtitleStream || initialSubtitleStream.DeliveryMethod === 'Encode') {
+                        this.#subtitleTrackIndexToSetOnPlaying = -1;
                     }
+                }
 
-                    const includeCorsCredentials = await getIncludeCorsCredentials();
+                this.#audioTrackIndexToSetOnPlaying = options.playMethod === 'Transcode' ? null : options.mediaSource.DefaultAudioStreamIndex;
 
-                    const hls = new Hls({
-                        manifestLoadingTimeOut: 20000,
-                        maxBufferLength: maxBufferLength,
-                        maxMaxBufferLength: maxMaxBufferLength,
-                        xhrSetup(xhr) {
-                            xhr.withCredentials = includeCorsCredentials;
-                        }
-                    });
-                    hls.loadSource(url);
-                    hls.attachMedia(elem);
-
-                    bindEventsToHlsPlayer(this, hls, elem, this.onError, resolve, reject);
-
-                    this._hlsPlayer = hls;
-
-                    // This is needed in setCurrentTrackElement
-                    this.#currentSrc = url;
-                });
+                this._currentPlayOptions = options;
+                const player = window.channel.objects.player;
+                player.load(val,
+                    { startMilliseconds: ms, autoplay: true },
+                    {type: "video", headers: {"User-Agent": "JellyfinMediaPlayer"}, frameRate: 0, media: {}},
+                    this.#audioTrackIndexToSetOnPlaying != -1 ? this.#audioTrackIndexToSetOnPlaying : "",
+                    this.#subtitleTrackIndexToSetOnPlaying != -1 ? this.#subtitleTrackIndexToSetOnPlaying : "",
+                    resolve);
             });
-        }
-
-        /**
-         * @private
-         */
-        async setCurrentSrc(elem, options) {
-            elem.removeEventListener('error', this.onError);
-
-            let val = options.url;
-            console.debug(`playing url: ${val}`);
-
-            // Convert to seconds
-            const seconds = (options.playerStartPositionTicks || 0) / 10000000;
-            if (seconds) {
-                val += `#t=${seconds}`;
-            }
-
-            destroyHlsPlayer(this);
-            destroyFlvPlayer(this);
-            destroyCastPlayer(this);
-
-            this.#subtitleTrackIndexToSetOnPlaying = options.mediaSource.DefaultSubtitleStreamIndex == null ? -1 : options.mediaSource.DefaultSubtitleStreamIndex;
-            if (this.#subtitleTrackIndexToSetOnPlaying != null && this.#subtitleTrackIndexToSetOnPlaying >= 0) {
-                const initialSubtitleStream = options.mediaSource.MediaStreams[this.#subtitleTrackIndexToSetOnPlaying];
-                if (!initialSubtitleStream || initialSubtitleStream.DeliveryMethod === 'Encode') {
-                    this.#subtitleTrackIndexToSetOnPlaying = -1;
-                }
-            }
-
-            this.#audioTrackIndexToSetOnPlaying = options.playMethod === 'Transcode' ? null : options.mediaSource.DefaultAudioStreamIndex;
-
-            this._currentPlayOptions = options;
-
-            const crossOrigin = getCrossOriginValue(options.mediaSource);
-            if (crossOrigin) {
-                elem.crossOrigin = crossOrigin;
-            }
-
-            if (enableHlsJsPlayer(options.mediaSource.RunTimeTicks, 'Video') && val.includes('.m3u8')) {
-                return this.setSrcWithHlsJs(elem, options, val);
-            } else if (options.playMethod !== 'Transcode' && options.mediaSource.Container === 'flv') {
-                return this.setSrcWithFlvJs(elem, options, val);
-            } else {
-                elem.autoplay = true;
-
-                const includeCorsCredentials = await getIncludeCorsCredentials();
-                if (includeCorsCredentials) {
-                    // Safari will not send cookies without this
-                    elem.crossOrigin = 'use-credentials';
-                }
-
-                return applySrc(elem, val, options).then(() => {
-                    this.#currentSrc = val;
-
-                    return playWithPromise(elem, this.onError);
-                });
-            }
         }
 
         setSubtitleStreamIndex(index) {
@@ -690,30 +509,21 @@ function tryRemoveElement(elem) {
         }
 
         destroy() {
-            destroyHlsPlayer(this);
-            destroyFlvPlayer(this);
-
             appRouter.setTransparency('none');
             document.body.classList.remove('hide-scroll');
 
-            const videoElement = this.#mediaElement;
 
-            if (videoElement) {
-                this.#mediaElement = null;
+            this.#mediaElement = null;
 
-                this.destroyCustomTrack(videoElement);
-                videoElement.removeEventListener('timeupdate', this.onTimeUpdate);
-                videoElement.removeEventListener('ended', this.onEnded);
-                videoElement.removeEventListener('volumechange', this.onVolumeChange);
-                videoElement.removeEventListener('pause', this.onPause);
-                videoElement.removeEventListener('playing', this.onPlaying);
-                videoElement.removeEventListener('play', this.onPlay);
-                videoElement.removeEventListener('click', this.onClick);
-                videoElement.removeEventListener('dblclick', this.onDblClick);
-                videoElement.removeEventListener('waiting', this.onWaiting);
+            const player = window.channel.objects.player;
+            player.playing.disconnect(this.onPlaying);
+            player.positionUpdate.disconnect(this.onTimeUpdate);
+            player.finished.disconnect(this.onEnded);
+            this.#duration = undefined;
+            player.updateDuration.disconnect(this.onDuration);
 
-                videoElement.parentNode.removeChild(videoElement);
-            }
+            videoElement.parentNode.removeChild(videoElement);
+
 
             const dlg = this.#videoDialog;
             if (dlg) {
@@ -748,17 +558,9 @@ function tryRemoveElement(elem) {
          * @private
          * @param e {Event} The event received from the `<video>` element
          */
-        onTimeUpdate = (e) => {
-            /**
-             * @type {HTMLMediaElement}
-             */
-            const elem = e.target;
-            // get the player position and the transcoding offset
-            const time = elem.currentTime;
-
+        onTimeUpdate = (time) => {
             if (time && !this.#timeUpdated) {
                 this.#timeUpdated = true;
-                this.ensureValidVideo(elem);
             }
 
             this.#currentTime = time;
@@ -768,7 +570,6 @@ function tryRemoveElement(elem) {
             if (currentPlayOptions) {
                 let timeMs = time * 1000;
                 timeMs += ((currentPlayOptions.transcodingOffsetTicks || 0) / 10000);
-                this.updateSubtitleText(timeMs);
             }
 
             Events.trigger(this, 'timeupdate');
@@ -816,23 +617,10 @@ function tryRemoveElement(elem) {
          * @param e {Event} The event received from the `<video>` element
          */
         onPlaying = (e) => {
-            /**
-             * @type {HTMLMediaElement}
-             */
-            const elem = e.target;
             if (!this.#started) {
                 this.#started = true;
-                elem.removeAttribute('controls');
 
                 loading.hide();
-
-                seekOnPlaybackStart(this, e.target, this._currentPlayOptions.playerStartPositionTicks, () => {
-                    if (this.#currentSubtitlesOctopus) {
-                        this.#currentSubtitlesOctopus.timeOffset = (this._currentPlayOptions.transcodingOffsetTicks || 0) / 10000000 + this.#currentTrackOffset;
-                        this.#currentSubtitlesOctopus.resize();
-                        this.#currentSubtitlesOctopus.resetRenderAheadCache(false);
-                    }
-                });
 
                 if (this._currentPlayOptions.fullscreen) {
                     appRouter.showVideoOsd().then(this.onNavigatedToOsd);
@@ -1255,42 +1043,6 @@ function tryRemoveElement(elem) {
         /**
          * @private
          */
-        updateSubtitleText(timeMs) {
-            const clock = this.#currentClock;
-            if (clock) {
-                try {
-                    clock.seek(timeMs / 1000);
-                } catch (err) {
-                    console.error(`error in libjass: ${err}`);
-                }
-                return;
-            }
-
-            const trackEvents = this.#currentTrackEvents;
-            const subtitleTextElement = this.#videoSubtitlesElem;
-
-            if (trackEvents && subtitleTextElement) {
-                const ticks = timeMs * 10000;
-                let selectedTrackEvent;
-                for (const trackEvent of trackEvents) {
-                    if (trackEvent.StartPositionTicks <= ticks && trackEvent.EndPositionTicks >= ticks) {
-                        selectedTrackEvent = trackEvent;
-                        break;
-                    }
-                }
-
-                if (selectedTrackEvent && selectedTrackEvent.Text) {
-                    subtitleTextElement.innerHTML = normalizeTrackEventText(selectedTrackEvent.Text, true);
-                    subtitleTextElement.classList.remove('hide');
-                } else {
-                    subtitleTextElement.classList.add('hide');
-                }
-            }
-        }
-
-        /**
-         * @private
-         */
         setCurrentTrackElement(streamIndex) {
             console.debug(`setting new text track index to: ${streamIndex}`);
 
@@ -1318,74 +1070,44 @@ function tryRemoveElement(elem) {
         createMediaElement(options) {
             const dlg = document.querySelector('.videoPlayerContainer');
 
-                if (!dlg) {
-                    return import('./style.css').then(() => {
-                        loading.show();
+            if (!dlg) {
+                return import('./style.css').then(() => {
+                    loading.show();
 
-                        const dlg = document.createElement('div');
+                    const dlg = document.createElement('div');
 
-                        dlg.classList.add('videoPlayerContainer');
+                    dlg.classList.add('videoPlayerContainer');
 
-                        if (options.fullscreen) {
-                            dlg.classList.add('videoPlayerContainer-onTop');
-                        }
-
-                        let html = '';
-                        const cssClass = 'htmlvideoplayer';
-
-                        // Can't autoplay in these browsers so we need to use the full controls, at least until playback starts
-                        if (!appHost.supports('htmlvideoautoplay')) {
-                            html += '<video class="' + cssClass + '" preload="metadata" autoplay="autoplay" controls="controls" webkit-playsinline playsinline>';
-                        } else {
-                            // Chrome 35 won't play with preload none
-                            html += '<video class="' + cssClass + '" preload="metadata" autoplay="autoplay" webkit-playsinline playsinline>';
-                        }
-
-                        html += '</video>';
-
-                        dlg.innerHTML = html;
-                        const videoElement = dlg.querySelector('video');
-
-                        videoElement.volume = getSavedVolume();
-                        videoElement.addEventListener('timeupdate', this.onTimeUpdate);
-                        videoElement.addEventListener('ended', this.onEnded);
-                        videoElement.addEventListener('volumechange', this.onVolumeChange);
-                        videoElement.addEventListener('pause', this.onPause);
-                        videoElement.addEventListener('playing', this.onPlaying);
-                        videoElement.addEventListener('play', this.onPlay);
-                        videoElement.addEventListener('click', this.onClick);
-                        videoElement.addEventListener('dblclick', this.onDblClick);
-                        videoElement.addEventListener('waiting', this.onWaiting);
-                        if (options.backdropUrl) {
-                            videoElement.poster = options.backdropUrl;
-                        }
-
-                        document.body.insertBefore(dlg, document.body.firstChild);
-                        this.#videoDialog = dlg;
-                        this.#mediaElement = videoElement;
-
-                        if (options.fullscreen) {
-                            // At this point, we must hide the scrollbar placeholder, so it's not being displayed while the item is being loaded
-                            document.body.classList.add('hide-scroll');
-                        }
-
-                        // don't animate on smart tv's, too slow
-                        if (options.fullscreen && browser.supportsCssAnimation() && !browser.slow) {
-                            return zoomIn(dlg).then(function () {
-                                return videoElement;
-                            });
-                        } else {
-                            return videoElement;
-                        }
-                    });
-                } else {
-                    // we need to hide scrollbar when starting playback from page with animated background
                     if (options.fullscreen) {
-                        document.body.classList.add('hide-scroll');
+                        dlg.classList.add('videoPlayerContainer-onTop');
                     }
 
-                    return Promise.resolve(dlg.querySelector('video'));
+                    let html = '';
+
+                    dlg.innerHTML = html;
+
+                    document.body.insertBefore(dlg, document.body.firstChild);
+                    this.#videoDialog = dlg;
+                    const player = window.channel.objects.player;
+                    player.playing.connect(this.onPlaying);
+                    player.positionUpdate.connect(this.onTimeUpdate);
+                    player.finished.connect(this.onEnded);
+                    player.updateDuration.disconnect(this.onDuration);
+
+
+                    if (options.fullscreen) {
+                        // At this point, we must hide the scrollbar placeholder, so it's not being displayed while the item is being loaded
+                        document.body.classList.add('hide-scroll');
+                    }
+                });
+            } else {
+                // we need to hide scrollbar when starting playback from page with animated background
+                if (options.fullscreen) {
+                    document.body.classList.add('hide-scroll');
                 }
+
+                return Promise.resolve();
+            }
         }
 
     /**
@@ -1410,9 +1132,41 @@ function tryRemoveElement(elem) {
      * @private
      */
     getDeviceProfile(item, options) {
-        return HtmlVideoPlayer.getDeviceProfileInternal(item, options).then((profile) => {
-            this.#lastProfile = profile;
-            return profile;
+        return Promise.resolve({
+            "Name": "Jellyfin Media Player",
+            "MusicStreamingTranscodingBitrate": 1280000,
+            "TimelineOffsetSeconds": 5,
+            "TranscodingProfiles": [
+                {"Type": "Audio"},
+                {
+                    "Container": "ts",
+                    "Type": "Video",
+                    "Protocol": "hls",
+                    "AudioCodec": "aac,mp3,ac3,opus,flac,vorbis",
+                    "VideoCodec": "h264,h265,hevc,mpeg4,mpeg2video",
+                    "MaxAudioChannels": "6",
+                },
+                {"Container": "jpeg", "Type": "Photo"},
+            ],
+            "DirectPlayProfiles": [{"Type": "Video"}, {"Type": "Audio"}, {"Type": "Photo"}],
+            "ResponseProfiles": [],
+            "ContainerProfiles": [],
+            "CodecProfiles": [],
+            "SubtitleProfiles": [
+                {"Format": "srt", "Method": "External"},
+                {"Format": "srt", "Method": "Embed"},
+                {"Format": "ass", "Method": "External"},
+                {"Format": "ass", "Method": "Embed"},
+                {"Format": "sub", "Method": "Embed"},
+                {"Format": "sub", "Method": "External"},
+                {"Format": "ssa", "Method": "Embed"},
+                {"Format": "ssa", "Method": "External"},
+                {"Format": "smi", "Method": "Embed"},
+                {"Format": "smi", "Method": "External"},
+                {"Format": "pgssub", "Method": "Embed"},
+                {"Format": "dvdsub", "Method": "Embed"},
+                {"Format": "pgs", "Method": "Embed"},
+            ],
         });
     }
 
@@ -1471,29 +1225,21 @@ function tryRemoveElement(elem) {
 
     // Save this for when playback stops, because querying the time at that point might return 0
     currentTime(val) {
-        const mediaElement = this.#mediaElement;
-        if (mediaElement) {
-            if (val != null) {
-                mediaElement.currentTime = val / 1000;
-                return;
-            }
-
-            const currentTime = this.#currentTime;
-            if (currentTime) {
-                return currentTime * 1000;
-            }
-
-            return (mediaElement.currentTime || 0) * 1000;
+        if (val != null) {
+            window.channel.objects.player.seekTo(val);
+            return;
         }
+
+        return this.#currentTime;
+    }
+
+    onDuration(duration) {
+        this.#duration = duration;
     }
 
     duration() {
-        const mediaElement = this.#mediaElement;
-        if (mediaElement) {
-            const duration = mediaElement.duration;
-            if (isValidDuration(duration)) {
-                return duration * 1000;
-            }
+        if (this.#duration) {
+            return this.#duration;
         }
 
         return null;

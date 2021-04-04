@@ -1742,6 +1742,7 @@ class PlaybackManager {
             }, function (e) {
                 const playerData = getPlayerData(player);
                 playerData.isChangingStream = false;
+                console.error(e);
 
                 onPlaybackError.call(player, e, {
                     type: 'mediadecodeerror',

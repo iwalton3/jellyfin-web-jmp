@@ -143,8 +143,14 @@
             }
         }
     </style>
+      <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+      <script>
+          new QWebChannel(window.qt.webChannelTransport, function(channel) {
+              window.channel = channel;
+          });
+      </script>
 </head>
-<body>
+<body style="cursor: default">
     <div class="backdropContainer"></div>
     <div class="backgroundContainer"></div>
     <div class="mainDrawer hide">
