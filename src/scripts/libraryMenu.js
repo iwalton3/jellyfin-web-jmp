@@ -77,9 +77,7 @@ import Headroom from 'headroom.js';
 
     function onBackClick() {
         if (skinHeader.classList.contains('osdHeader')){
-            playbackManager.stop().then(() => {
-                appRouter.back();
-            });
+            playbackManager.stop();
         } else {
             appRouter.back();
         }
