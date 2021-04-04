@@ -364,27 +364,6 @@ import globalize from '../../scripts/globalize';
         /**
          * @private
          */
-        onPlay = () => {
-            Events.trigger(this, 'unpause');
-        };
-
-        /**
-         * @private
-         */
-        onClick = () => {
-            Events.trigger(this, 'click');
-        };
-
-        /**
-         * @private
-         */
-        onDblClick = () => {
-            Events.trigger(this, 'dblclick');
-        };
-
-        /**
-         * @private
-         */
         onPause = () => {
             this.#paused = true;
             Events.trigger(this, 'pause');
@@ -580,18 +559,19 @@ import globalize from '../../scripts/globalize';
 
     pause() {
         this.#paused = true;
-        window.channel.objects.player.pause()
+        window.channel.objects.player.pause();
     }
 
     // This is a retry after error
     resume() {
         this.#paused = false;
-        window.channel.objects.player.play()
+        window.channel.objects.player.play();
     }
 
     unpause() {
         this.#paused = false;
-        window.channel.objects.player.play()
+        window.channel.objects.player.play();
+        Events.trigger(this, 'unpause');
     }
 
     paused() {
