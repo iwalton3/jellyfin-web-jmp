@@ -1,30 +1,4 @@
 /**
- * Creates an audio element that plays a silent sound.
- * @returns {HTMLMediaElement} The audio element.
- */
-function createTestMediaElement () {
-    const elem = document.createElement('audio');
-    elem.classList.add('testMediaPlayerAudio');
-    elem.classList.add('hide');
-
-    document.body.appendChild(elem);
-
-    elem.volume = 1; // Volume should not be zero to trigger proper permissions
-    elem.src = 'assets/audio/silence.mp3'; // Silent sound
-
-    return elem;
-}
-
-/**
- * Destroys a media element.
- * @param {HTMLMediaElement} elem The element to destroy.
- */
-function destroyTestMediaElement (elem) {
-    elem.pause();
-    elem.remove();
-}
-
-/**
  * Class that manages the playback permission.
  */
 class PlaybackPermissionManager {
@@ -33,16 +7,7 @@ class PlaybackPermissionManager {
      * @returns {Promise} Promise that resolves succesfully if playback permission is allowed.
      */
     check () {
-        return new Promise((resolve, reject) => {
-            const media = createTestMediaElement();
-            media.play().then(() => {
-                resolve();
-            }).catch((error) => {
-                reject(error);
-            }).finally(() => {
-                destroyTestMediaElement(media);
-            });
-        });
+        return Promise.resolve(true);
     }
 }
 

@@ -7,12 +7,6 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 const Assets = [
     'native-promise-only/npo.js',
     'libarchive.js/dist/worker-bundle.js',
-    'libass-wasm/dist/js/subtitles-octopus-worker.js',
-    'libass-wasm/dist/js/subtitles-octopus-worker.data',
-    'libass-wasm/dist/js/subtitles-octopus-worker.wasm',
-    'libass-wasm/dist/js/subtitles-octopus-worker-legacy.js',
-    'libass-wasm/dist/js/subtitles-octopus-worker-legacy.data',
-    'libass-wasm/dist/js/subtitles-octopus-worker-legacy.js.mem',
     'pdfjs-dist/build/pdf.worker.js'
 ];
 

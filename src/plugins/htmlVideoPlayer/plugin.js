@@ -106,6 +106,10 @@ import globalize from '../../scripts/globalize';
          * @type {boolean}
          */
         #muted = false;
+        /**
+         * @type {float}
+         */
+        #playRate = 1;
 
         constructor() {
             if (browser.edgeUwp) {
@@ -307,7 +311,6 @@ import globalize from '../../scripts/globalize';
 
         /**
          * @private
-         * @param e {Event} The event received from the `<video>` element
          */
         onTimeUpdate = (time) => {
             if (time && !this.#timeUpdated) {
@@ -315,14 +318,6 @@ import globalize from '../../scripts/globalize';
             }
 
             this.#currentTime = time;
-
-            const currentPlayOptions = this._currentPlayOptions;
-            // Not sure yet how this is coming up null since we never null it out, but it is causing app crashes
-            if (currentPlayOptions) {
-                let timeMs = time * 1000;
-                timeMs += ((currentPlayOptions.transcodingOffsetTicks || 0) / 10000);
-            }
-
             Events.trigger(this, 'timeupdate');
         };
 
@@ -349,6 +344,8 @@ import globalize from '../../scripts/globalize';
                 if (volume != this.#volume) {
                     this.setVolume(volume, false);
                 }
+
+                this.setPlaybackRate(1);
 
                 if (this._currentPlayOptions.fullscreen) {
                     appRouter.showVideoOsd().then(this.onNavigatedToOsd);
@@ -490,7 +487,7 @@ import globalize from '../../scripts/globalize';
      * @private
      */
     static getSupportedFeatures() {
-        return [];
+        return ['PlaybackRate'];
     }
 
     supports(feature) {
@@ -509,6 +506,12 @@ import globalize from '../../scripts/globalize';
         }
 
         return this.#currentTime;
+    }
+
+    currentTimeAsync() {
+        return new Promise((resolve) => {
+            window.channel.objects.player.getPosition(resolve);
+        });
     }
 
     onDuration(duration) {
@@ -579,16 +582,36 @@ import globalize from '../../scripts/globalize';
     }
 
     setPlaybackRate(value) {
+        this.#playRate = value;
+        window.channel.objects.player.setPlaybackRate(value * 1000);
     }
 
     getPlaybackRate() {
-        return 1;
+        return this.#playRate;
     }
 
     getSupportedPlaybackRates() {
         return [{
+            name: '0.5x',
+            id: 0.5
+        }, {
+            name: '0.75x',
+            id: 0.75
+        }, {
             name: '1x',
             id: 1.0
+        }, {
+            name: '1.25x',
+            id: 1.25
+        }, {
+            name: '1.5x',
+            id: 1.5
+        }, {
+            name: '1.75x',
+            id: 1.75
+        }, {
+            name: '2x',
+            id: 2.0
         }];
     }
 

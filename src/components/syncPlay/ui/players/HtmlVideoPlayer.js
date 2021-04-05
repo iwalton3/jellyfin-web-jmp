@@ -128,6 +128,14 @@ class HtmlVideoPlayer extends NoActivePlayer {
     }
 
     /**
+     * Gets current playback position.
+     * @returns {Promise<number>} The player position, in milliseconds.
+     */
+    currentTimeAsync() {
+        return this.player.currentTimeAsync();
+    }
+
+    /**
      * Checks if player has playback rate support.
      * @returns {boolean} _true _ if playback rate is supported, false otherwise.
      */
