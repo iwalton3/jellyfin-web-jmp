@@ -354,7 +354,12 @@ import globalize from '../../scripts/globalize';
                     this.#videoDialog.classList.remove('videoPlayerContainer-onTop');
                 }
             }
-            this.#paused = false;
+
+            if (this.#paused) {
+                this.#paused = false;
+                Events.trigger(this, 'unpause');
+            }
+            
             Events.trigger(this, 'playing');
         };
 
@@ -363,6 +368,7 @@ import globalize from '../../scripts/globalize';
          */
         onPause = () => {
             this.#paused = true;
+            // For Syncplay ready notification
             Events.trigger(this, 'pause');
         };
 
@@ -561,7 +567,6 @@ import globalize from '../../scripts/globalize';
     }
 
     pause() {
-        this.#paused = true;
         window.channel.objects.player.pause();
     }
 
@@ -572,9 +577,7 @@ import globalize from '../../scripts/globalize';
     }
 
     unpause() {
-        this.#paused = false;
         window.channel.objects.player.play();
-        Events.trigger(this, 'unpause');
     }
 
     paused() {

@@ -449,7 +449,6 @@ class PlaybackCore {
             console.debug('SyncPlay localSeek: no active player!');
             return;
         }
-
         const playerWrapper = this.manager.getPlayerWrapper();
         return playerWrapper.localSeek(positionTicks);
     }

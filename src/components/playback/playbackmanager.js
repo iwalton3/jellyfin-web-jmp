@@ -1616,6 +1616,12 @@ class PlaybackManager {
                 return player.seek(ticks);
             }
 
+            if (player.id == "htmlvideoplayer") {
+                // No I don't want to reload the video
+                // each time the video seeks.....
+                return player.currentTime(ticks / 10000);
+            }
+
             changeStream(player, ticks);
         };
 
