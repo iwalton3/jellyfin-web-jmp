@@ -4,7 +4,8 @@ import loading from '../../components/loading/loading';
 import { appRouter } from '../../components/appRouter';
 import {
     saveVolume,
-    getSavedVolume
+    getSavedVolume,
+    onErrorInternal
 } from '../../components/htmlMediaHelper';
 import Screenfull from 'screenfull';
 import globalize from '../../scripts/globalize';
