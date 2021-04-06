@@ -429,7 +429,7 @@ function getPlaybackInfo(player,
     enableDirectStream,
     allowVideoStreamCopy,
     allowAudioStreamCopy) {
-    if (!itemHelper.isLocalItem(item) && item.MediaType === 'Audio') {
+    /*if (!itemHelper.isLocalItem(item) && item.MediaType === 'Audio') {
         return Promise.resolve({
             MediaSources: [
                 {
@@ -439,7 +439,7 @@ function getPlaybackInfo(player,
                     RunTimeTicks: item.RunTimeTicks
                 }]
         });
-    }
+    }*/
 
     if (item.PresetMediaSource) {
         return Promise.resolve({
@@ -1616,7 +1616,7 @@ class PlaybackManager {
                 return player.seek(ticks);
             }
 
-            if (player.id == "htmlvideoplayer") {
+            if (player.id == "htmlvideoplayer" || player.id == "htmlaudioplayer") {
                 // No I don't want to reload the video
                 // each time the video seeks.....
                 return player.currentTime(ticks / 10000);

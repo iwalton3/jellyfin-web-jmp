@@ -9,6 +9,7 @@ import {
 } from '../../components/htmlMediaHelper';
 import Screenfull from 'screenfull';
 import globalize from '../../scripts/globalize';
+import { Thumbs } from 'swiper';
 
 /* eslint-disable indent */
 
@@ -347,6 +348,7 @@ import globalize from '../../scripts/globalize';
                 }
 
                 this.setPlaybackRate(1);
+                this.setMute(false);
 
                 if (this._currentPlayOptions.fullscreen) {
                     appRouter.showVideoOsd().then(this.onNavigatedToOsd);
@@ -625,7 +627,7 @@ import globalize from '../../scripts/globalize';
             saveVolume((val || 100) / 100);
             Events.trigger(this, 'volumechange');
         }
-        window.channel.objects.player.setVolume(val)
+        window.channel.objects.player.setVolume(val);
     }
 
     getVolume() {
