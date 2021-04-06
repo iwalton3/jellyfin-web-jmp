@@ -141,6 +141,28 @@ import { Thumbs } from 'swiper';
         /**
          * @private
          */
+        getSubtitleParam() {
+            const options = this._currentPlayOptions;
+
+            if (this.#subtitleTrackIndexToSetOnPlaying != null && this.#subtitleTrackIndexToSetOnPlaying >= 0) {
+                const initialSubtitleStream = options.mediaSource.MediaStreams[this.#subtitleTrackIndexToSetOnPlaying];
+                if (!initialSubtitleStream || initialSubtitleStream.DeliveryMethod === 'Encode') {
+                    this.#subtitleTrackIndexToSetOnPlaying = -1;
+                } else if (initialSubtitleStream.DeliveryMethod === 'External') {
+                    return "#," + initialSubtitleStream.DeliveryUrl;
+                }
+            }
+
+            if (this.#subtitleTrackIndexToSetOnPlaying == -1 || this.#subtitleTrackIndexToSetOnPlaying == null) {
+                return "";
+            }
+
+            return "#" + this.#subtitleTrackIndexToSetOnPlaying;
+        }
+
+        /**
+         * @private
+         */
         setCurrentSrc(elem, options) {
             return new Promise((resolve) => {
                 let val = options.url;
@@ -148,46 +170,24 @@ import { Thumbs } from 'swiper';
 
                 // Convert to seconds
                 const ms = (options.playerStartPositionTicks || 0) / 10000;
-                let subtitleUrl = undefined;
-
+                this._currentPlayOptions = options;
                 this.#subtitleTrackIndexToSetOnPlaying = options.mediaSource.DefaultSubtitleStreamIndex == null ? -1 : options.mediaSource.DefaultSubtitleStreamIndex;
-                if (this.#subtitleTrackIndexToSetOnPlaying != null && this.#subtitleTrackIndexToSetOnPlaying >= 0) {
-                    const initialSubtitleStream = options.mediaSource.MediaStreams[this.#subtitleTrackIndexToSetOnPlaying];
-                    if (!initialSubtitleStream || initialSubtitleStream.DeliveryMethod === 'Encode') {
-                        this.#subtitleTrackIndexToSetOnPlaying = -1;
-                    } else if (initialSubtitleStream.DeliveryMethod === 'External') {
-                        subtitleUrl = initialSubtitleStream.DeliveryUrl;
-                    }
-                }
-
                 this.#audioTrackIndexToSetOnPlaying = options.playMethod === 'Transcode' ? null : options.mediaSource.DefaultAudioStreamIndex;
 
-                this._currentPlayOptions = options;
                 const player = window.channel.objects.player;
                 player.load(val,
                     { startMilliseconds: ms, autoplay: true },
                     {type: "video", headers: {"User-Agent": "JellyfinMediaPlayer"}, frameRate: 0, media: {}},
-                    this.#audioTrackIndexToSetOnPlaying != -1 ? "#" + this.#audioTrackIndexToSetOnPlaying : "",
-                    subtitleUrl || this.#subtitleTrackIndexToSetOnPlaying != -1 ? "#" + this.#subtitleTrackIndexToSetOnPlaying : "",
+                    (this.#audioTrackIndexToSetOnPlaying != null)
+                     ? "#" + this.#audioTrackIndexToSetOnPlaying : "#1",
+                    this.getSubtitleParam(),
                     resolve);
             });
         }
 
         setSubtitleStreamIndex(index) {
             this.#subtitleTrackIndexToSetOnPlaying = index;
-            const options = this._currentPlayOptions;
-            let subtitleUrl = undefined;
-
-            if (this.#subtitleTrackIndexToSetOnPlaying != null && this.#subtitleTrackIndexToSetOnPlaying >= 0) {
-                const initialSubtitleStream = options.mediaSource.MediaStreams[this.#subtitleTrackIndexToSetOnPlaying];
-                if (!initialSubtitleStream || initialSubtitleStream.DeliveryMethod === 'Encode') {
-                    this.#subtitleTrackIndexToSetOnPlaying = -1;
-                } else if (initialSubtitleStream.DeliveryMethod === 'External') {
-                    subtitleUrl = initialSubtitleStream.DeliveryUrl;
-                }
-            }
-
-            window.channel.objects.player.setSubtitleStream(subtitleUrl || this.#subtitleTrackIndexToSetOnPlaying != -1 ? "#" + this.#subtitleTrackIndexToSetOnPlaying : "");
+            window.channel.objects.player.setSubtitleStream(this.getSubtitleParam());
         }
 
         resetSubtitleOffset() {

@@ -2355,6 +2355,14 @@ class PlaybackManager {
             const mediaSourceContainer = (mediaSource.Container || '').toLowerCase();
             let directOptions;
 
+            if (mediaSource.MediaStreams) {
+                mediaSource.MediaStreams.map(stream => {
+                    if (stream.DeliveryUrl && stream.DeliveryUrl.startsWith("/")) {
+                        stream.DeliveryUrl = apiClient.getUrl(stream.DeliveryUrl);
+                    }
+                });
+            }
+
             if (type === 'Video' || type === 'Audio') {
                 contentType = getMimeType(type.toLowerCase(), mediaSourceContainer);
 

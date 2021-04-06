@@ -82,7 +82,7 @@ class HtmlAudioPlayer {
                 const player = window.channel.objects.player;
                 player.load(val,
                     { startMilliseconds: ms, autoplay: true },
-                    {type: "audio", headers: {"User-Agent": "JellyfinMediaPlayer"}, frameRate: 0, media: {}},
+                    {type: "music", headers: {"User-Agent": "JellyfinMediaPlayer"}, frameRate: 0, media: {}},
                     "#1",
                     "",
                     resolve);
