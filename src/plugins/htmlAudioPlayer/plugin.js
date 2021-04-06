@@ -9,7 +9,7 @@ function fade(instance, elem, startingVolume) {
     // This is due to iOS safari not allowing volume changes and always returning the system volume value
     const newVolume = Math.max(0, startingVolume - 15);
     console.debug('fading volume to ' + newVolume);
-    instance.setVolume(newVolume, false);
+    window.channel.objects.player.setVolume(newVolume);
 
     if (newVolume <= 0) {
         instance._isFadingOut = false;
