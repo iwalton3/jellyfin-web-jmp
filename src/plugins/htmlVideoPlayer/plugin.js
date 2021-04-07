@@ -375,7 +375,7 @@ import { Thumbs } from 'swiper';
             Events.trigger(this, 'pause');
         };
 
-        onWaiting() {
+        onWaiting = () => {
             Events.trigger(this, 'waiting');
         }
 
@@ -523,7 +523,7 @@ import { Thumbs } from 'swiper';
         });
     }
 
-    onDuration(duration) {
+    onDuration = (duration) => {
         this.#duration = duration;
     }
 

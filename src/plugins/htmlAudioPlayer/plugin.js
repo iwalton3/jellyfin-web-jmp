@@ -57,6 +57,7 @@ class HtmlAudioPlayer {
             self._started = false;
             self._timeUpdated = false;
             self._currentTime = null;
+            self._duration = undefined;
 
             const player = window.channel.objects.player;
             player.playing.connect(onPlaying);
@@ -102,7 +103,6 @@ class HtmlAudioPlayer {
         }
 
         self.stop = function (destroyPlayer) {
-            console.log("die");
             cancelFadeTimeout();
 
             const src = self._currentSrc;
