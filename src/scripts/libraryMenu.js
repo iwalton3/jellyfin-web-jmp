@@ -78,7 +78,7 @@ import Headroom from 'headroom.js';
     function onBackClick() {
         // If playing on a player that can't be destroyed with navigation, stop it manually.
         const player = playbackManager.getCurrentPlayer();
-        if (player && player.mustDestroy && skinHeader.classList.contains('osdHeader')){
+        if (player && player.mustDestroy && skinHeader.classList.contains('osdHeader')) {
             playbackManager.stop();
         } else {
             appRouter.back();

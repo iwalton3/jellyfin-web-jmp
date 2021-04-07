@@ -1,10 +1,10 @@
-import { getIgnorePlayPermission } from "../../../scripts/settings/webSettings";
+import { getIgnorePlayPermission } from '../../../scripts/settings/webSettings';
 
 /**
  * Creates an audio element that plays a silent sound.
  * @returns {HTMLMediaElement} The audio element.
  */
- function createTestMediaElement () {
+function createTestMediaElement () {
     const elem = document.createElement('audio');
     elem.classList.add('testMediaPlayerAudio');
     elem.classList.add('hide');
@@ -38,7 +38,7 @@ class PlaybackPermissionManager {
         if (await getIgnorePlayPermission()) {
             return true;
         }
-        
+
         return await new Promise((resolve, reject) => {
             const media = createTestMediaElement();
             media.play().then(() => {

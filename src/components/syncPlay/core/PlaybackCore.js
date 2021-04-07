@@ -121,8 +121,8 @@ class PlaybackCore {
     async sendBufferingRequest(isBuffering = true) {
         const playerWrapper = this.manager.getPlayerWrapper();
         const currentPosition = (playerWrapper.currentTimeAsync
-             ? await playerWrapper.currentTimeAsync()
-             : playerWrapper.currentTime());
+            ? await playerWrapper.currentTimeAsync()
+            : playerWrapper.currentTime());
         const currentPositionTicks = Math.round(currentPosition * Helper.TicksPerMillisecond);
         const isPlaying = playerWrapper.isPlaying();
 

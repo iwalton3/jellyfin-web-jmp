@@ -21,8 +21,9 @@ function loadScript(src) {
 }
 
 async function createApi() {
-    await loadScript("qrc:///qtwebchannel/qwebchannel.js");
+    await loadScript('qrc:///qtwebchannel/qwebchannel.js');
     const channel = await new Promise((resolve) => {
+        /*global QWebChannel */
         new QWebChannel(window.qt.webChannelTransport, resolve);
     });
     return channel.objects;
@@ -34,7 +35,7 @@ async function getApi() {
     }
 
     window.apiPromise = createApi();
-    return await window.apiPromise
+    return await window.apiPromise;
 }
 
 /* eslint-disable indent */
@@ -163,7 +164,7 @@ async function getApi() {
             loading.show();
             await this.ensureApi();
             this.#api.power.setScreensaverEnabled(false);
-            const elem = await this.createMediaElement(options)
+            const elem = await this.createMediaElement(options);
             return await this.setCurrentSrc(elem, options);
         }
 
@@ -178,15 +179,15 @@ async function getApi() {
                 if (!initialSubtitleStream || initialSubtitleStream.DeliveryMethod === 'Encode') {
                     this.#subtitleTrackIndexToSetOnPlaying = -1;
                 } else if (initialSubtitleStream.DeliveryMethod === 'External') {
-                    return "#," + initialSubtitleStream.DeliveryUrl;
+                    return '#,' + initialSubtitleStream.DeliveryUrl;
                 }
             }
 
             if (this.#subtitleTrackIndexToSetOnPlaying == -1 || this.#subtitleTrackIndexToSetOnPlaying == null) {
-                return "";
+                return '';
             }
 
-            return "#" + this.#subtitleTrackIndexToSetOnPlaying;
+            return '#' + this.#subtitleTrackIndexToSetOnPlaying;
         }
 
         /**
@@ -194,7 +195,7 @@ async function getApi() {
          */
         setCurrentSrc(elem, options) {
             return new Promise((resolve) => {
-                let val = options.url;
+                const val = options.url;
                 console.debug(`playing url: ${val}`);
 
                 // Convert to seconds
@@ -206,9 +207,9 @@ async function getApi() {
                 const player = this.#api.player;
                 player.load(val,
                     { startMilliseconds: ms, autoplay: true },
-                    {type: "video", headers: {"User-Agent": "JellyfinMediaPlayer"}, frameRate: 0, media: {}},
+                    {type: 'video', headers: {'User-Agent': 'JellyfinMediaPlayer'}, frameRate: 0, media: {}},
                     (this.#audioTrackIndexToSetOnPlaying != null)
-                     ? "#" + this.#audioTrackIndexToSetOnPlaying : "#1",
+                     ? '#' + this.#audioTrackIndexToSetOnPlaying : '#1',
                     this.getSubtitleParam(),
                     resolve);
             });
@@ -253,7 +254,7 @@ async function getApi() {
         /**
          * @private
          */
-        isAudioStreamSupported(stream, deviceProfile) {
+        isAudioStreamSupported() {
             return true;
         }
 
@@ -278,16 +279,16 @@ async function getApi() {
                 return;
             }
 
-            this.#api.player.setAudioStream(index != -1 ? "#" + index : "");
+            this.#api.player.setAudioStream(index != -1 ? '#' + index : '');
         }
 
         onEndedInternal() {
             const stopInfo = {
                 src: this._currentSrc
             };
-    
+
             Events.trigger(this, 'stopped', [stopInfo]);
-    
+
             this._currentTime = null;
             this._currentSrc = null;
             this._currentPlayOptions = null;
@@ -342,7 +343,7 @@ async function getApi() {
         /**
          * @private
          */
-        onEnded = (e) => {
+        onEnded = () => {
             this.onEndedInternal();
         };
 
@@ -371,7 +372,7 @@ async function getApi() {
         /**
          * @private
          */
-        onPlaying = (e) => {
+        onPlaying = () => {
             if (!this.#started) {
                 this.#started = true;
 
@@ -397,7 +398,7 @@ async function getApi() {
                 this.#paused = false;
                 Events.trigger(this, 'unpause');
             }
-            
+
             Events.trigger(this, 'playing');
         };
 
@@ -412,7 +413,7 @@ async function getApi() {
 
         onWaiting = () => {
             Events.trigger(this, 'waiting');
-        }
+        };
 
         /**
          * @private
@@ -442,7 +443,7 @@ async function getApi() {
                         dlg.classList.add('videoPlayerContainer-onTop');
                     }
 
-                    let html = '';
+                    const html = '';
 
                     dlg.innerHTML = html;
 
@@ -481,49 +482,49 @@ async function getApi() {
     /**
      * @private
      */
-    supportsPlayMethod(playMethod, item) {
+    supportsPlayMethod() {
         return true;
     }
 
     /**
      * @private
      */
-    getDeviceProfile(item, options) {
+    getDeviceProfile() {
         return Promise.resolve({
-            "Name": "Jellyfin Media Player",
-            "MusicStreamingTranscodingBitrate": 1280000,
-            "TimelineOffsetSeconds": 5,
-            "TranscodingProfiles": [
-                {"Type": "Audio"},
+            'Name': 'Jellyfin Media Player',
+            'MusicStreamingTranscodingBitrate': 1280000,
+            'TimelineOffsetSeconds': 5,
+            'TranscodingProfiles': [
+                {'Type': 'Audio'},
                 {
-                    "Container": "ts",
-                    "Type": "Video",
-                    "Protocol": "hls",
-                    "AudioCodec": "aac,mp3,ac3,opus,flac,vorbis",
-                    "VideoCodec": "h264,h265,hevc,mpeg4,mpeg2video",
-                    "MaxAudioChannels": "6",
+                    'Container': 'ts',
+                    'Type': 'Video',
+                    'Protocol': 'hls',
+                    'AudioCodec': 'aac,mp3,ac3,opus,flac,vorbis',
+                    'VideoCodec': 'h264,h265,hevc,mpeg4,mpeg2video',
+                    'MaxAudioChannels': '6'
                 },
-                {"Container": "jpeg", "Type": "Photo"},
+                {'Container': 'jpeg', 'Type': 'Photo'}
             ],
-            "DirectPlayProfiles": [{"Type": "Video"}, {"Type": "Audio"}, {"Type": "Photo"}],
-            "ResponseProfiles": [],
-            "ContainerProfiles": [],
-            "CodecProfiles": [],
-            "SubtitleProfiles": [
-                {"Format": "srt", "Method": "External"},
-                {"Format": "srt", "Method": "Embed"},
-                {"Format": "ass", "Method": "External"},
-                {"Format": "ass", "Method": "Embed"},
-                {"Format": "sub", "Method": "Embed"},
-                {"Format": "sub", "Method": "External"},
-                {"Format": "ssa", "Method": "Embed"},
-                {"Format": "ssa", "Method": "External"},
-                {"Format": "smi", "Method": "Embed"},
-                {"Format": "smi", "Method": "External"},
-                {"Format": "pgssub", "Method": "Embed"},
-                {"Format": "dvdsub", "Method": "Embed"},
-                {"Format": "pgs", "Method": "Embed"},
-            ],
+            'DirectPlayProfiles': [{'Type': 'Video'}, {'Type': 'Audio'}, {'Type': 'Photo'}],
+            'ResponseProfiles': [],
+            'ContainerProfiles': [],
+            'CodecProfiles': [],
+            'SubtitleProfiles': [
+                {'Format': 'srt', 'Method': 'External'},
+                {'Format': 'srt', 'Method': 'Embed'},
+                {'Format': 'ass', 'Method': 'External'},
+                {'Format': 'ass', 'Method': 'Embed'},
+                {'Format': 'sub', 'Method': 'Embed'},
+                {'Format': 'sub', 'Method': 'External'},
+                {'Format': 'ssa', 'Method': 'Embed'},
+                {'Format': 'ssa', 'Method': 'External'},
+                {'Format': 'smi', 'Method': 'Embed'},
+                {'Format': 'smi', 'Method': 'External'},
+                {'Format': 'pgssub', 'Method': 'Embed'},
+                {'Format': 'dvdsub', 'Method': 'Embed'},
+                {'Format': 'pgs', 'Method': 'Embed'}
+            ]
         });
     }
 
@@ -545,7 +546,7 @@ async function getApi() {
     // Save this for when playback stops, because querying the time at that point might return 0
     currentTime(val) {
         if (val != null) {
-            this.ensureApi().then(() => {;
+            this.ensureApi().then(() => {
                 this.#api.player.seekTo(val);
             });
             return;
@@ -563,7 +564,7 @@ async function getApi() {
 
     onDuration = (duration) => {
         this.#duration = duration;
-    }
+    };
 
     duration() {
         if (this.#duration) {
@@ -581,9 +582,7 @@ async function getApi() {
         console.error(`Picture in picture error: ${err}`);
     }
 
-    setPictureInPictureEnabled(isEnabled) {
-
-    }
+    setPictureInPictureEnabled() {}
 
     isPictureInPictureEnabled() {
         return false;
@@ -593,11 +592,9 @@ async function getApi() {
         return false;
     }
 
-    setAirPlayEnabled(isEnabled) {
-    }
+    setAirPlayEnabled() {}
 
-    setBrightness(val) {
-    }
+    setBrightness() {}
 
     getBrightness() {
         return 100;
@@ -695,7 +692,7 @@ async function getApi() {
         return this.#muted;
     }
 
-    setAspectRatio(val) {
+    setAspectRatio() {
     }
 
     getAspectRatio() {

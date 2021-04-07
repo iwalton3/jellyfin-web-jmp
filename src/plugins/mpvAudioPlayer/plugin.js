@@ -12,8 +12,9 @@ function loadScript(src) {
 }
 
 async function createApi() {
-    await loadScript("qrc:///qtwebchannel/qwebchannel.js");
+    await loadScript('qrc:///qtwebchannel/qwebchannel.js');
     const channel = await new Promise((resolve) => {
+        /*global QWebChannel */
         new QWebChannel(window.qt.webChannelTransport, resolve);
     });
     return channel.objects;
@@ -25,7 +26,7 @@ async function getApi() {
     }
 
     window.apiPromise = createApi();
-    return await window.apiPromise
+    return await window.apiPromise;
 }
 
 let fadeTimeout;
@@ -81,7 +82,7 @@ class HtmlAudioPlayer {
             if (!self.api) {
                 self.api = await getApi();
             }
-        }
+        };
 
         self.play = async (options) => {
             self._started = false;
@@ -103,7 +104,7 @@ class HtmlAudioPlayer {
 
         function setCurrentSrc(options) {
             return new Promise((resolve) => {
-                let val = options.url;
+                const val = options.url;
                 self._currentSrc = val;
                 console.debug('playing url: ' + val);
 
@@ -113,9 +114,9 @@ class HtmlAudioPlayer {
 
                 self.api.player.load(val,
                     { startMilliseconds: ms, autoplay: true },
-                    {type: "music", headers: {"User-Agent": "JellyfinMediaPlayer"}, frameRate: 0, media: {}},
-                    "#1",
-                    "",
+                    {type: 'music', headers: {'User-Agent': 'JellyfinMediaPlayer'}, frameRate: 0, media: {}},
+                    '#1',
+                    '',
                     resolve);
             });
         }
@@ -124,13 +125,13 @@ class HtmlAudioPlayer {
             const stopInfo = {
                 src: self._currentSrc
             };
-    
+
             Events.trigger(self, 'stopped', [stopInfo]);
-    
+
             self._currentTime = null;
             self._currentSrc = null;
             self._currentPlayOptions = null;
-        }
+        };
 
         self.stop = async (destroyPlayer) => {
             cancelFadeTimeout();
@@ -185,14 +186,14 @@ class HtmlAudioPlayer {
             }
         }
 
-        function onPlaying(e) {
+        function onPlaying() {
             if (!self._started) {
                 self._started = true;
             }
 
             self.setPlaybackRate(1);
             self.setMute(false);
-            
+
             if (self._paused) {
                 self._paused = false;
                 Events.trigger(self, 'unpause');
@@ -206,11 +207,7 @@ class HtmlAudioPlayer {
             Events.trigger(self, 'pause');
         }
 
-        function onWaiting() {
-            Events.trigger(self, 'waiting');
-        }
-
-        function onError() {
+        function onError(error) {
             console.error(`media element error: ${error}`);
 
             htmlMediaHelper.onErrorInternal(self, 'mediadecodeerror');
@@ -225,19 +222,19 @@ class HtmlAudioPlayer {
         return (mediaType || '').toLowerCase() === 'audio';
     }
 
-    getDeviceProfile(item) {
+    getDeviceProfile() {
         return Promise.resolve({
-            "Name": "Jellyfin Media Player",
-            "MusicStreamingTranscodingBitrate": 1280000,
-            "TimelineOffsetSeconds": 5,
-            "TranscodingProfiles": [
-                {"Type": "Audio"},
+            'Name': 'Jellyfin Media Player',
+            'MusicStreamingTranscodingBitrate': 1280000,
+            'TimelineOffsetSeconds': 5,
+            'TranscodingProfiles': [
+                {'Type': 'Audio'}
             ],
-            "DirectPlayProfiles": [{"Type": "Audio"}],
-            "ResponseProfiles": [],
-            "ContainerProfiles": [],
-            "CodecProfiles": [],
-            "SubtitleProfiles": [],
+            'DirectPlayProfiles': [{'Type': 'Audio'}],
+            'ResponseProfiles': [],
+            'ContainerProfiles': [],
+            'CodecProfiles': [],
+            'SubtitleProfiles': []
         });
     }
 
@@ -375,7 +372,7 @@ class HtmlAudioPlayer {
 let supportedFeatures;
 
 function getSupportedFeatures() {
-    return ["PlaybackRate"];
+    return ['PlaybackRate'];
 }
 
 export default HtmlAudioPlayer;

@@ -2351,7 +2351,7 @@ class PlaybackManager {
 
             if (mediaSource.MediaStreams && player.useFullSubtitleUrls) {
                 mediaSource.MediaStreams.map(stream => {
-                    if (stream.DeliveryUrl && stream.DeliveryUrl.startsWith("/")) {
+                    if (stream.DeliveryUrl && stream.DeliveryUrl.startsWith('/')) {
                         stream.DeliveryUrl = apiClient.getUrl(stream.DeliveryUrl);
                     }
                 });

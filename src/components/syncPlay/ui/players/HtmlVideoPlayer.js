@@ -25,7 +25,7 @@ class HtmlVideoPlayer extends NoActivePlayer {
              */
             this.currentTimeAsync = () => {
                 return this.player.currentTimeAsync();
-            }
+            };
         }
     }
 
