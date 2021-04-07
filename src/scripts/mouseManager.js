@@ -52,7 +52,33 @@ import dom from '../scripts/dom';
         }
     }
 
+    let lastPointerMoveData;
     function onPointerMove(e) {
+        const eventX = e.screenX || e.clientX;
+        const eventY = e.screenY || e.clientY;
+
+        // if coord don't exist how could it move
+        if (typeof eventX === 'undefined' && typeof eventY === 'undefined') {
+            return;
+        }
+
+        const obj = lastPointerMoveData;
+        if (!obj) {
+            lastPointerMoveData = {
+                x: eventX,
+                y: eventY
+            };
+            return;
+        }
+
+        // if coord are same, it didn't move
+        if (Math.abs(eventX - obj.x) < 10 && Math.abs(eventY - obj.y) < 10) {
+            return;
+        }
+
+        obj.x = eventX;
+        obj.y = eventY;
+
         lastMouseInputTime = new Date().getTime();
         notifyApp();
 
