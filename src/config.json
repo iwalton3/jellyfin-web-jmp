@@ -1,7 +1,6 @@
 {
   "includeCorsCredentials": false,
-  "multiserver": true,
-  "ignorePlayPermission": true,
+  "multiserver": false,
   "themes": [
     {
       "name": "Apple TV",
@@ -28,8 +27,8 @@
   "plugins": [
     "playAccessValidation/plugin",
     "experimentalWarnings/plugin",
-    "mpvAudioPlayer/plugin",
-    "mpvVideoPlayer/plugin",
+    "htmlAudioPlayer/plugin",
+    "htmlVideoPlayer/plugin",
     "photoPlayer/plugin",
     "comicsPlayer/plugin",
     "bookPlayer/plugin",
