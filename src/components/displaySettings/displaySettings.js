@@ -162,7 +162,7 @@ import template from './displaySettings.template.html';
         userSettingsInstance.detailsBanner(context.querySelector('#chkDetailsBanner').checked);
 
         userSettingsInstance.disableCustomCss(context.querySelector('#chkDisableCustomCss').checked);
-        userSettingsInstance.customCss(context.querySelector('#txtLocalCustomCss').value)
+        userSettingsInstance.customCss(context.querySelector('#txtLocalCustomCss').value);
 
         if (user.Id === apiClient.getCurrentUserId()) {
             skinManager.setTheme(userSettingsInstance.theme());

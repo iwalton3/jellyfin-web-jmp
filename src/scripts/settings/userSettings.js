@@ -274,7 +274,7 @@ export class UserSettings {
      * @param {string|undefined} val - Language.
      * @return {string} Language.
      */
-     customCss(val) {
+    customCss(val) {
         if (val !== undefined) {
             return this.set('customCss', val.toString(), false);
         }
