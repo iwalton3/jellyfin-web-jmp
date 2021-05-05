@@ -228,7 +228,7 @@ import browser from './browser';
                 supported = browser.tizen;
                 break;
             case 'mov':
-                supported = browser.tizen || browser.web0s || browser.chrome || browser.edgeChromium || browser.edgeUwp;
+                supported = browser.safari || browser.tizen || browser.web0s || browser.chrome || browser.edgeChromium || browser.edgeUwp;
                 videoCodecs.push('h264');
                 break;
             case 'm2ts':
@@ -462,6 +462,10 @@ import browser from './browser';
             // safari is lying on HDR and 60fps videos, use fMP4 instead
             if (!browser.safari) {
                 mp4VideoCodecs.push('hevc');
+            }
+
+            if (browser.tizen || browser.web0s) {
+                hlsInTsVideoCodecs.push('hevc');
             }
         }
 
