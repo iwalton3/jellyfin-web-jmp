@@ -1,3 +1,5 @@
+<h1>Attention: If you are a maintainer looking for the webclient for Jellyfin Media Player, go here: https://repo.jellyfin.org/releases/server/portable/versions/stable/web/</h1>
+
 <h1 align="center">Jellyfin Web</h1>
 <h3 align="center">Part of the <a href="https://jellyfin.org">Jellyfin Project</a></h3>
 
